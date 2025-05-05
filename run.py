@@ -2,14 +2,15 @@ from shapely import wkt
 
 if __name__ == "__main__":
 
-    from nightlights import download, process
+    from nightlights import download, process, postprocess
 
     download_dir = "./data/raw"
-    process_dir = "./data/processed"
+    extraction_dir = "./data/extracted"
+    output_dir = "./data/output"
 
     # Define search parameters
     short_name = "VNP46A3"
-    version = "1"  # Latest version of MOD13Q1
+    version = "1"
     start_date = "2024-12-12"
     end_date = "2024-12-15"
     count = 10
@@ -29,4 +30,6 @@ if __name__ == "__main__":
         count=count,
     )
 
-    process.process_files(files, process_dir, bounding_box=region.bounds)
+    process.process_files(files, variable_name="AllAngle_Composite_Snow_Free", output_dir=extraction_dir, bounding_box=region.bounds)
+
+    postprocess.produce_output(extraction_dir, output_dir)

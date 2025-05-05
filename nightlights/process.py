@@ -7,7 +7,7 @@ import rioxarray as rxr
 from shapely import Polygon
 
 
-def process_file(path: str, bounding_box: tuple = None) -> pd.DataFrame:
+def process_file(path: str, variable_name: str, bounding_box: tuple = None) -> pd.DataFrame:
     """
     This function processes a raster file containing Black Marble data and returns a DataFrame with the extracted information.
 
@@ -21,6 +21,7 @@ def process_file(path: str, bounding_box: tuple = None) -> pd.DataFrame:
         pd.DataFrame: A DataFrame containing the extracted information from the raster file.
     """
     with rxr.open_rasterio(path) as data_obj:
+        prefix = "HDFEOS_GRIDS_VIIRS_Grid_DNB_2d_Data_Fields_"
         filename = path.split("/")[-1].replace(".h5", "")
         Tile = [x for x in filename.split(".") if ("h" in x) and ("v" in x)][0]
         Julian_date = filename.split(".")[1].replace("A", "")
@@ -53,7 +54,7 @@ def process_file(path: str, bounding_box: tuple = None) -> pd.DataFrame:
 
         def clean_column_name(colname):
             return colname.replace(
-                "HDFEOS_GRIDS_VIIRS_Grid_DNB_2d_Data_Fields_", ""
+                prefix, ""
             )
 
         variables = list(data_obj.var().variables)
@@ -102,7 +103,6 @@ def process_file(path: str, bounding_box: tuple = None) -> pd.DataFrame:
         )
         data["filename"] = filename
         
-        print(f"Total data points before filtering: {len(data)}")
         # Filter by bounding box if provided
         if bounding_box is not None:
             min_lon, min_lat, max_lon, max_lat = bounding_box
@@ -111,7 +111,35 @@ def process_file(path: str, bounding_box: tuple = None) -> pd.DataFrame:
                 data["latitude"].between(min_lat, max_lat)
             )
             data = data[lon_lat_filter]
-            
+
+        data = data.drop([
+            "latitude",
+            "longitude",
+        ], axis=1)
+
+        data["variable_name"] = variable_name
+        data = data.rename(columns={variable_name: "value"})
+        fill_value = data_obj.attrs[f"{prefix}{variable_name}__FillValue"]
+        scale_factor = data_obj.attrs[f"{prefix}{variable_name}_scale_factor"]
+        offset_value = data_obj.attrs[f"{prefix}{variable_name}_offset"]
+        data["value"] = data["value"].replace(fill_value, np.nan)
+        data["value"] = data["value"] * scale_factor + offset_value
+
+        data = data[[
+            "filename",
+            "Date",
+            "loncorner0",
+            "latcorner0",
+            "loncorner1",
+            "latcorner1",
+            "loncorner2",
+            "latcorner2",
+            "loncorner3",
+            "latcorner3",
+            "value",
+            "variable_name",
+        ]]
+
         return data
 
 def corners_to_geometry(df):
@@ -144,14 +172,14 @@ def corners_to_geometry(df):
     return df
 
 
-def process_files(list_of_files: list, output_dir: str, bounding_box: tuple = None) -> None:
+def process_files(list_of_files: list, variable_name: str, output_dir: str, bounding_box: tuple = None) -> None:
     os.makedirs(output_dir, exist_ok=True)
 
     print(f"Processing {len(list_of_files)} files.")
     for file in list_of_files:
         filename = file.split("/")[-1]
         output_file = filename.replace(".h5", ".csv")
-        df = process_file(file, bounding_box=bounding_box)
+        df = process_file(file, variable_name=variable_name, bounding_box=bounding_box)
         df = corners_to_geometry(df)
         df.to_csv(f"{output_dir}/{output_file}", index=None)
 
