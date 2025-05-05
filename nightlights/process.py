@@ -7,14 +7,15 @@ import rioxarray as rxr
 from shapely import Polygon
 
 
-def process_file(path: str) -> pd.DataFrame:
+def process_file(path: str, bounding_box: tuple = None) -> pd.DataFrame:
     """
     This function processes a raster file containing Black Marble data and returns a DataFrame with the extracted information.
 
     Args:
         path (str): The path to the raster file to be processed.
-        area_of_interest (str): The area of interest for the processing.
-        variables (list): A list of variables to be extracted from the raster file. If 'all' is provided, all variables will be extracted.
+        bounding_box (tuple, optional): A tuple containing the bounding box coordinates in the format
+            (lower_left_lon, lower_left_lat, upper_right_lon, upper_right_lat). If provided, only data within
+            this bounding box will be returned. Defaults to None.
 
     Returns:
         pd.DataFrame: A DataFrame containing the extracted information from the raster file.
@@ -66,31 +67,25 @@ def process_file(path: str) -> pd.DataFrame:
             .reset_index()
         )
 
-        data["latitude"] = NorthBoundCoord - data["y"] * lat_pixel_length
-        data["longitude"] = WestBoundCoord + data["x"] * long_pixel_length
+        data["latitude"] = data["y"]
+        data["longitude"] = data["x"]
 
         # Create date variable (Julian and calendar format)
         data = data.assign(Julian_Date=Julian_date)
         data = data.assign(Date=Calendar_date)
-
-        data = data.assign(westboundcoord=WestBoundCoord)
-        data = data.assign(northboundcoord=NorthBoundCoord)
-        data = data.assign(eastboundcoord=EastBoundCoord)
-        data = data.assign(southboundcoord=SouthBoundCoord)
-
         data = data.assign(tile=Tile)
 
-        data["latcorner0"] = data["latitude"] - (lat_pixel_length / 2)
-        data["loncorner0"] = data["longitude"] - (long_pixel_length / 2)
+        data["latcorner0"] = pd.to_numeric(data["latitude"] - (lat_pixel_length / 2))
+        data["loncorner0"] = pd.to_numeric(data["longitude"] - (long_pixel_length / 2))
 
-        data["latcorner1"] = data["latitude"] - (lat_pixel_length / 2)
-        data["loncorner1"] = data["longitude"] + (long_pixel_length / 2)
+        data["latcorner1"] = pd.to_numeric(data["latitude"] - (lat_pixel_length / 2))
+        data["loncorner1"] = pd.to_numeric(data["longitude"] + (long_pixel_length / 2))
 
-        data["latcorner2"] = data["latitude"] + (lat_pixel_length / 2)
-        data["loncorner2"] = data["longitude"] + (long_pixel_length / 2)
+        data["latcorner2"] = pd.to_numeric(data["latitude"] + (lat_pixel_length / 2))
+        data["loncorner2"] = pd.to_numeric(data["longitude"] + (long_pixel_length / 2))
 
-        data["latcorner3"] = data["latitude"] + (lat_pixel_length / 2)
-        data["loncorner3"] = data["longitude"] - (long_pixel_length / 2)
+        data["latcorner3"] = pd.to_numeric(data["latitude"] + (lat_pixel_length / 2))
+        data["loncorner3"] = pd.to_numeric(data["longitude"] - (long_pixel_length / 2))
 
         """ pyarrow won't write uint dtypes"""
         ints = data.select_dtypes(exclude=[float, object]).columns.tolist()
@@ -102,16 +97,22 @@ def process_file(path: str) -> pd.DataFrame:
                 "y",
                 "band",
                 "spatial_ref",
-                "westboundcoord",
-                "northboundcoord",
-                "eastboundcoord",
-                "southboundcoord",
             ],
             axis=1,
         )
         data["filename"] = filename
+        
+        print(f"Total data points before filtering: {len(data)}")
+        # Filter by bounding box if provided
+        if bounding_box is not None:
+            min_lon, min_lat, max_lon, max_lat = bounding_box
+            lon_lat_filter = (
+                data["longitude"].between(min_lon, max_lon) & 
+                data["latitude"].between(min_lat, max_lat)
+            )
+            data = data[lon_lat_filter]
+            
         return data
-
 
 def corners_to_geometry(df):
     """
@@ -143,14 +144,14 @@ def corners_to_geometry(df):
     return df
 
 
-def process_files(list_of_files: list, output_dir: str) -> None:
+def process_files(list_of_files: list, output_dir: str, bounding_box: tuple = None) -> None:
     os.makedirs(output_dir, exist_ok=True)
 
     print(f"Processing {len(list_of_files)} files.")
     for file in list_of_files:
         filename = file.split("/")[-1]
         output_file = filename.replace(".h5", ".csv")
-        df = process_file(file)
+        df = process_file(file, bounding_box=bounding_box)
         df = corners_to_geometry(df)
         df.to_csv(f"{output_dir}/{output_file}", index=None)
 

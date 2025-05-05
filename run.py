@@ -15,7 +15,7 @@ if __name__ == "__main__":
     count = 10
 
     region = wkt.loads(
-        "POLYGON((-63.58 -34.32, -58.34 -34.32, -58.34 -34.71, -63.58 -34.71, -63.58 -34.32))"
+        "POLYGON((-62.32 -33.01, -56.6 -33.01, -56.6 -37.34, -62.32 -37.34, -62.32 -33.01))"
     )
     auth = download.login()
 
@@ -29,4 +29,4 @@ if __name__ == "__main__":
         count=count,
     )
 
-    process.process_files(files, process_dir)
+    process.process_files(files, process_dir, bounding_box=region.bounds)
