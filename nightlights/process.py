@@ -110,7 +110,7 @@ def process_file(path: str) -> pd.DataFrame:
             axis=1,
         )
         data["filename"] = filename
-        return data.apply(pd.to_numeric)
+        return data
 
 
 def corners_to_geometry(df):
@@ -148,7 +148,8 @@ def process_files(list_of_files: list, output_dir: str) -> None:
 
     print(f"Processing {len(list_of_files)} files.")
     for file in list_of_files:
-        output_file = file.replace(".h5", ".csv")
+        filename = file.split("/")[-1]
+        output_file = filename.replace(".h5", ".csv")
         df = process_file(file)
         df = corners_to_geometry(df)
         df.to_csv(f"{output_dir}/{output_file}", index=None)
