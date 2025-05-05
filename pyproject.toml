@@ -8,6 +8,7 @@ authors = [
 license = {text = "MIT"}
 readme = "README.md"
 requires-python = ">=3.10,<4.0"
+packages = [{ include = "nightlights" }]
 
 dependencies = [
     "xarray (>=2025.4.0,<2026.0.0)",
