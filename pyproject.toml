@@ -1,0 +1,17 @@
+[project]
+name = "nightlights"
+version = "0.1.0"
+description = "This repository is to download and process of NASA's Black Marble Nightlights Suite."
+authors = [
+    {name = "Jerónimo Luza",email = "jero.luza@gmail.com"}
+]
+license = {text = "MIT"}
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
