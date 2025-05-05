@@ -4,9 +4,10 @@ if __name__ == "__main__":
 
     from nightlights import download, process, postprocess
 
-    download_dir = "./data/raw"
-    extraction_dir = "./data/extracted"
-    output_dir = "./data/output"
+    session_slug = "testing"
+    download_dir = f"./data/{session_slug}/raw"
+    extraction_dir = f"./data/{session_slug}/extracted"
+    output_dir = f"./data/{session_slug}/output"
 
     # Define search parameters
     short_name = "VNP46A3"
@@ -16,7 +17,7 @@ if __name__ == "__main__":
     count = 10
 
     region = wkt.loads(
-        "POLYGON((-62.32 -33.01, -56.6 -33.01, -56.6 -37.34, -62.32 -37.34, -62.32 -33.01))"
+        "POLYGON((-61.64 -33.23, -57.92 -33.23, -57.92 -35.71, -61.64 -35.71, -61.64 -33.23))"
     )
     auth = download.login()
 
