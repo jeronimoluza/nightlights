@@ -122,6 +122,8 @@ def plot_file(path:str, variable_name:str, output_dir:str):
     
     print(f"Plotting {variable_name} from {path}...")
     
+    output_dir += "single_tiles/"
+    
     # Plot the data
     fig, ax = plot_nightlights(
         file_path=path,
@@ -162,6 +164,7 @@ def combine_and_plot_tiles(files: list, variable_name: str, output_dir: str, reg
         region (shapely.geometry.Polygon, optional): Region to filter by. Defaults to None.
     """
     # Create output directory if it doesn't exist
+    output_dir += "combined/"
     os.makedirs(output_dir, exist_ok=True)
     
     # Load all data and combine
