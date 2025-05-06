@@ -37,6 +37,6 @@ if __name__ == "__main__":
     # process.produce_output(extraction_dir, final_output_dir)
 
     plotting.plot_all_files(
-        files, variable_name=variable_name, output_dir=plot_dir, region=region
+        files, variable_name=variable_name, upper_title="Delhi Area Nightlights", output_dir=plot_dir, region=region
     )
 

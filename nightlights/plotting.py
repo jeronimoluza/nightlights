@@ -134,8 +134,17 @@ def plot_file(path:str, variable_name:str, output_dir:str):
     
     print("Done plotting!")
 
+def interpret_timeliness(product):
+    """Interprets the timeliness of the product."""
+    if product == "VNP46A2":
+        product += " (Daily)"
+    elif product == "VNP46A3":
+        product += " (Monthly)"
+    elif product == "VNP46A4":
+        product += " (Yearly)"
+    return product
 
-def plot_all_files(files: list, variable_name: str, output_dir: str, region=None):
+def plot_all_files(files: list, variable_name: str, upper_title: str, output_dir: str, region=None):
     """Plot all individual files and also create combined plots."""
     # Create output directory if it doesn't exist
     os.makedirs(output_dir, exist_ok=True)
@@ -150,10 +159,10 @@ def plot_all_files(files: list, variable_name: str, output_dir: str, region=None
     print("Creating combined plots...")
     
     # Use the dedicated function for combined plots
-    combine_and_plot_tiles(files, variable_name, output_dir, region)
+    combine_and_plot_tiles(files, variable_name, upper_title, output_dir, region)
 
 
-def combine_and_plot_tiles(files: list, variable_name: str, output_dir: str, region=None):
+def combine_and_plot_tiles(files: list, variable_name: str, upper_title: str, output_dir: str, region=None):
     """
     Combine data from all tiles, filter by region if provided, and create plots.
     
@@ -179,6 +188,8 @@ def combine_and_plot_tiles(files: list, variable_name: str, output_dir: str, reg
             fill_value = data_obj.attrs[f"{prefix}{variable_name}__FillValue"]
             scale_factor = data_obj.attrs[f"{prefix}{variable_name}_scale_factor"]
             offset_value = data_obj.attrs[f"{prefix}{variable_name}_offset"]
+            product = data_obj.attrs["ShortName"]
+            date = data_obj.attrs["RangeBeginningDate"]
             
             # First replace fill values with NaN, then apply scaling and offset
             data = np.where(data == fill_value, np.nan, data)
@@ -244,7 +255,8 @@ def combine_and_plot_tiles(files: list, variable_name: str, output_dir: str, reg
     ax.set_extent([lon_min-buffer, lon_max+buffer, lat_min-buffer, lat_max+buffer], crs=ccrs.PlateCarree())
     
     # Add title
-    plt.title(f'Combined Nightlights\nVariable: {variable_name}\nAll Tiles')
+    product = interpret_timeliness(product)
+    plt.title(f'{upper_title}\nDate: {date}\nProduct: {product}\nVariable: {variable_name}')
     
     # Save the plot
     output_path = os.path.join(output_dir, f"combined_{variable_name}_all_tiles.png")
@@ -289,7 +301,8 @@ def combine_and_plot_tiles(files: list, variable_name: str, output_dir: str, reg
         ax.set_extent([min_lon-buffer, max_lon+buffer, min_lat-buffer, max_lat+buffer], crs=ccrs.PlateCarree())
         
         # Add title
-        plt.title(f'Combined Nightlights\nVariable: {variable_name}\nRegion Filtered')
+        product = interpret_timeliness(product)
+        plt.title(f'{upper_title}\nDate: {date}\nProduct: {product}\nVariable: {variable_name}\n')
         
         # Save the plot
         output_path = os.path.join(output_dir, f"combined_{variable_name}_region_filtered.png")
