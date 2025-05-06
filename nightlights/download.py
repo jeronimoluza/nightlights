@@ -3,6 +3,8 @@ import earthaccess
 from shapely import wkt
 from shapely.geometry import MultiPolygon, Polygon
 import geopandas as gpd
+import datetime
+import pandas as pd
 
 
 def get_bounding_box(region):
@@ -63,6 +65,31 @@ def login():
     """
     return earthaccess.login()
 
+def get_file_date(file_path: str) -> str:
+    """
+    Extracts the date from the file name.
+    """
+    julian_date = file_path.split("/")[-1].split(".")[1].replace('A', '')
+    return datetime.datetime.strptime(julian_date, '%Y%j').strftime('%Y-%m-%d')
+
+def is_in_date_range(file_date, start_date: str, end_date: str) -> bool:
+    """
+    Checks if the file date is within the specified date range.
+    """
+    return pd.to_datetime(start_date) <= pd.to_datetime(file_date) <= pd.to_datetime(end_date)
+
+def filter_granules(granules: list, start_date: str, end_date: str):
+    """
+    Filters the granules to only include those within the specified date range.
+    """
+    filtered_granules = []
+    for g in granules:
+        file_date = get_file_date(g.data_links()[0])
+        if is_in_date_range(file_date, start_date, end_date):
+            filtered_granules.append(g)
+    if len(granules) != len(filtered_granules):
+        print(f"Filtered {len(granules) - len(filtered_granules)} granules.")
+    return filtered_granules
 
 def download_earthaccess(
     download_dir: str,
@@ -71,7 +98,7 @@ def download_earthaccess(
     start_date: str,
     end_date: str,
     region,
-    count: int = 10,
+    count: int = -1,
 ) -> list:
     """
     Downloads Earth observation data from the Earth Access platform.
@@ -86,7 +113,7 @@ def download_earthaccess(
     - start_date (str): The start date of the search period in 'YYYY-MM-DD' format.
     - end_date (str): The end date of the search period in 'YYYY-MM-DD' format.
     - region (Polygon, MultiPolygon, GeoDataFrame, or WKT string): The region of interest.
-    - count (int, optional): The maximum number of granules to download. Default is 10.
+    - count (int, optional): The maximum number of granules to download. Default is -1 (all granules).
 
     Returns:
     - list: A list of downloaded file paths.
@@ -106,7 +133,9 @@ def download_earthaccess(
         count=count,
     )
 
-    print(f"Found {len(granules)} granules (count parameter is {count}).")
+    print(f"Found {len(granules)} granules.")
+    granules = filter_granules(granules=granules, start_date=start_date, end_date=end_date)
+
     if len(granules) == 0:
         return
     else:

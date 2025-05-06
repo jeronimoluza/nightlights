@@ -184,3 +184,16 @@ def process_files(list_of_files: list, variable_name: str, output_dir: str, boun
         df.to_csv(f"{output_dir}/{output_file}", index=None)
 
     print(f"Processed files are in folder {output_dir}")
+
+def produce_output(extraction_dir: str, output_dir: str) -> None:
+    os.makedirs(output_dir, exist_ok=True)
+    
+    files = os.listdir(extraction_dir)
+    output = []
+    
+    for file in files:
+        df = pd.read_csv(f"{extraction_dir}/{file}")
+        output.append(df) 
+    
+    output = pd.concat(output)
+    output.to_csv(f"{output_dir}/output.csv", index=None)

@@ -2,9 +2,9 @@ from shapely import wkt
 
 if __name__ == "__main__":
 
-    from nightlights import download, plotting, process, postprocess
+    from nightlights import download, plotting, process
 
-    session_slug = "asia_china"
+    session_slug = "delhi"
     download_dir = f"./data/{session_slug}/raw"
     extraction_dir = f"./data/{session_slug}/extracted"
     plot_dir = f"./data/{session_slug}/plots"
@@ -13,16 +13,11 @@ if __name__ == "__main__":
     # Define search parameters
     short_name = "VNP46A3"
     version = "1"
-    start_date = "2024-12-12"
-    end_date = "2024-12-15"
-    count = 100
+    start_date = "2024-12-01"
+    end_date = "2024-12-31"
 
     region = wkt.loads(
-        # "POLYGON((-66.45 -28.66, -55.14 -28.66, -55.14 -38.67, -66.45 -38.67, -66.45 -28.66))"
-        # "POLYGON((-64.98 -33.97, -57.16 -33.97, -57.16 -35.26, -64.98 -35.26, -64.98 -33.97))"
-        # "POLYGON((-77.9205 41.7018, -72.8854 41.7018, -72.8854 38.0936, -77.9205 38.0936, -77.9205 41.7018))"
-        # "POLYGON((-11.15 50.32, 16.69 50.32, 16.69 35.22, -11.15 35.22, -11.15 50.32))"
-        "POLYGON((95.9 42.1, 143.9 42.1, 143.9 6.7, 95.9 6.7, 95.9 42.1))"
+        "POLYGON((74.96 29.86, 79.49 29.86, 79.49 27.3, 74.96 27.3, 74.96 29.86))"
     )
     auth = download.login()
 
@@ -33,13 +28,15 @@ if __name__ == "__main__":
         start_date=start_date,
         end_date=end_date,
         region=region,
-        count=count,
     )
 
-    variable_name="AllAngle_Composite_Snow_Free"
+    variable_name = "AllAngle_Composite_Snow_Free"
 
     # process.process_files(files, variable_name=variable_name, output_dir=extraction_dir, bounding_box=region.bounds)
 
-    # postprocess.produce_output(extraction_dir, final_output_dir)
-    
-    plotting.plot_all_files(files, variable_name=variable_name, output_dir=plot_dir, region=region)
+    # process.produce_output(extraction_dir, final_output_dir)
+
+    plotting.plot_all_files(
+        files, variable_name=variable_name, output_dir=plot_dir, region=region
+    )
+

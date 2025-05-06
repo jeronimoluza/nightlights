@@ -122,7 +122,7 @@ def plot_file(path:str, variable_name:str, output_dir:str):
     
     print(f"Plotting {variable_name} from {path}...")
     
-    output_dir += "single_tiles/"
+    output_dir += "/single_tiles/"
     
     # Plot the data
     fig, ax = plot_nightlights(
@@ -164,7 +164,7 @@ def combine_and_plot_tiles(files: list, variable_name: str, output_dir: str, reg
         region (shapely.geometry.Polygon, optional): Region to filter by. Defaults to None.
     """
     # Create output directory if it doesn't exist
-    output_dir += "combined/"
+    output_dir += "/combined/"
     os.makedirs(output_dir, exist_ok=True)
     
     # Load all data and combine
@@ -274,10 +274,6 @@ def combine_and_plot_tiles(files: list, variable_name: str, output_dir: str, reg
         # Plot the combined filtered data
         mesh = ax.pcolormesh(combined_data_filtered.x, combined_data_filtered.y, 
                            combined_data_filtered, cmap='cividis', transform=ccrs.PlateCarree())
-        
-        # Draw the region boundary
-        x, y = region.exterior.xy
-        ax.plot(x, y, color='red', linewidth=1.5, transform=ccrs.PlateCarree())
         
         # Add a colorbar
         cbar = plt.colorbar(mesh, ax=ax, pad=0.01, shrink=0.8)
