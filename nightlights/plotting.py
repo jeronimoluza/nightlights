@@ -101,6 +101,8 @@ def plot_nightlights(file_path: str, variable_name: str, output_dir: str = None,
     # Save or display the plot
     if output_dir:
         os.makedirs(output_dir, exist_ok=True)
+        if log_scale:
+            output_path = os.path.join(output_dir, f"{Path(filename).stem}_{variable_name}_log.png")
         output_path = os.path.join(output_dir, f"{Path(filename).stem}_{variable_name}.png")
         plt.savefig(output_path, dpi=300, bbox_inches='tight')
         print(f"Plot saved to: {output_path}")
