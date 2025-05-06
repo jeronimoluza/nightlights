@@ -4,10 +4,11 @@ if __name__ == "__main__":
 
     from nightlights import download, plotting, process, postprocess
 
-    session_slug = "testing"
+    session_slug = "dc"
     download_dir = f"./data/{session_slug}/raw"
     extraction_dir = f"./data/{session_slug}/extracted"
-    output_dir = f"./data/{session_slug}/output"
+    plot_dir = f"./data/{session_slug}/plots"
+    final_output_dir = f"./data/{session_slug}/output"
 
     # Define search parameters
     short_name = "VNP46A3"
@@ -17,7 +18,9 @@ if __name__ == "__main__":
     count = 10
 
     region = wkt.loads(
-        "POLYGON((-66.45 -28.66, -55.14 -28.66, -55.14 -38.67, -66.45 -38.67, -66.45 -28.66))"
+        # "POLYGON((-66.45 -28.66, -55.14 -28.66, -55.14 -38.67, -66.45 -38.67, -66.45 -28.66))"
+        # "POLYGON((-64.98 -33.97, -57.16 -33.97, -57.16 -35.26, -64.98 -35.26, -64.98 -33.97))"
+        "POLYGON((-77.9205 41.7018, -72.8854 41.7018, -72.8854 38.0936, -77.9205 38.0936, -77.9205 41.7018))"
     )
     auth = download.login()
 
@@ -31,8 +34,11 @@ if __name__ == "__main__":
         count=count,
     )
 
-    process.process_files(files, variable_name="AllAngle_Composite_Snow_Free", output_dir=extraction_dir, bounding_box=region.bounds)
+    variable_name="AllAngle_Composite_Snow_Free"
 
-    postprocess.produce_output(extraction_dir, output_dir)
+    # process.process_files(files, variable_name=variable_name, output_dir=extraction_dir, bounding_box=region.bounds)
+
+    # postprocess.produce_output(extraction_dir, final_output_dir)
     
-    plotting.plot_file()
+    #plotting.plot_file()
+    plotting.plot_all_files(files, variable_name=variable_name, output_dir=plot_dir, region=region)
