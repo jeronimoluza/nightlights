@@ -14,23 +14,23 @@ VARIABLE_NAME = "AllAngle_Composite_Snow_Free"
 # Output directory for the plot
 OUTPUT_DIR = "output/plots"
 
-def main():
+def plot_file(path:str, variable_name:str, output_dir:str):
     """Run the plotting function and display the result."""
     # Ensure the file exists
-    if not os.path.exists(H5_FILE):
-        print(f"Error: File not found: {H5_FILE}")
+    if not os.path.exists(path):
+        print(f"Error: File not found: {path}")
         return
     
     # Create the output directory if it doesn't exist
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     
-    print(f"Plotting {VARIABLE_NAME} from {H5_FILE}...")
+    print(f"Plotting {variable_name} from {path}...")
     
     # Plot the data
     fig, ax = plot_nightlights(
-        file_path=H5_FILE,
-        variable_name=VARIABLE_NAME,
-        output_dir=OUTPUT_DIR,
+        file_path=path,
+        variable_name=variable_name,
+        output_dir=output_dir,
         # cmap="cividis", # You can try other colormaps like 'plasma', 'inferno', 'magma', etc.
     )
     

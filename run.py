@@ -2,7 +2,7 @@ from shapely import wkt
 
 if __name__ == "__main__":
 
-    from nightlights import download, process, postprocess
+    from nightlights import download, plotting, process, postprocess
 
     session_slug = "testing"
     download_dir = f"./data/{session_slug}/raw"
@@ -34,3 +34,5 @@ if __name__ == "__main__":
     process.process_files(files, variable_name="AllAngle_Composite_Snow_Free", output_dir=extraction_dir, bounding_box=region.bounds)
 
     postprocess.produce_output(extraction_dir, output_dir)
+    
+    plotting.plot_file()

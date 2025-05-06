@@ -108,3 +108,22 @@ def plot_nightlights(file_path: str, variable_name: str, output_dir: str = None,
         print(f"Plot saved to: {output_path}")
     
     return fig, ax
+
+def plot_file(path:str, variable_name:str, output_dir:str):
+    """Run the plotting function and display the result."""
+    # Ensure the file exists
+    if not os.path.exists(path):
+        print(f"Error: File not found: {path}")
+        return
+    
+    print(f"Plotting {variable_name} from {path}...")
+    
+    # Plot the data
+    fig, ax = plot_nightlights(
+        file_path=path,
+        variable_name=variable_name,
+        output_dir=output_dir,
+        # cmap="cividis", # You can try other colormaps like 'plasma', 'inferno', 'magma', etc.
+    )
+    
+    print("Done plotting!")
