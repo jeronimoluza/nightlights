@@ -13,8 +13,8 @@ if __name__ == "__main__":
     # Define search parameters
     short_name = "VNP46A3"
     version = "1"
-    start_date = "2024-12-01"
-    end_date = "2024-12-31"
+    start_date = "2024-01-01"
+    end_date = "2024-03-31"
 
     region = wkt.loads(
         "POLYGON((5.9559 47.8084, 10.4921 47.8084, 10.4921 45.818, 5.9559 45.818, 5.9559 47.8084))"
