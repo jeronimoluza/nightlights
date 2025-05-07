@@ -51,7 +51,7 @@ def load_data_from_h5(
             ),
             "offset": data_obj.attrs.get(f"{var_path}_offset", 0.0),
             "product": data_obj.attrs.get("ShortName", ""),
-            "date": data_obj.attrs.get("RangeBeginningDate", ""),
+            "date": data_obj.attrs.get("RangeBeginningdate", ""),
             "lons": data_obj.x.values,
             "lats": data_obj.y.values,
         }
@@ -373,7 +373,7 @@ def plot_all_files(
         combined_data = process_and_plot_date(
             date_files,
             variable_name,
-            f"{upper_title}\nDate: {date}",
+            f"{upper_title}\ndate: {date}",
             date_output_path,
             None,  # No region filtering
         )
@@ -386,7 +386,7 @@ def plot_all_files(
             filter_and_plot_region(
                 combined_data,
                 variable_name,
-                f"{upper_title}\nDate: {date}",
+                f"{upper_title}\ndate: {date}",
                 filtered_output_path,
                 region,
             )
@@ -408,7 +408,7 @@ def group_files_by_date(files: List[str]) -> Dict[str, List[str]]:
     for file in tqdm(files, desc="Grouping files by date"):
         try:
             with rxr.open_rasterio(file) as data_obj:
-                date = data_obj.attrs.get("RangeBeginningDate", "unknown")
+                date = data_obj.attrs.get("RangeBeginningdate", "unknown")
                 files_by_date[date].append(file)
         except Exception as e:
             print(f"Error reading date from {file}: {e}")
@@ -422,7 +422,7 @@ def create_timelapse_gif(
     upper_title: str,
     output_dir: str,
     region=None,
-    duration: float = 15.0,
+    duration: float = 5.0,
 ) -> None:
     """Create a timelapse GIF from multiple dates of data, using only region-filtered data.
 
@@ -697,7 +697,7 @@ def create_frame(
 
     Args:
         data (xarray.DataArray): Data to plot
-        date (str): Date string for the frame
+        date (str): date string for the frame
         variable_name (str): Name of the variable being plotted
         upper_title (str): Title to display at the top of the plot
         output_dir (str): Directory to save the frame
@@ -735,7 +735,7 @@ def create_frame(
         set_map_extent(ax, data)
 
     # Add title
-    plt.title(f"{upper_title}\nDate: {date}\nVariable: {variable_name}")
+    plt.title(f"{upper_title}\ndate: {date}\nVariable: {variable_name}")
 
     # Save the frame
     frame_path = os.path.join(output_dir, f"frame_{date.replace('-','')}.png")
@@ -798,7 +798,7 @@ def combine_and_plot_tiles(
     try:
         with rxr.open_rasterio(files[0]) as data_obj:
             product = data_obj.attrs.get("ShortName", "")
-            date = data_obj.attrs.get("RangeBeginningDate", "")
+            date = data_obj.attrs.get("RangeBeginningdate", "")
     except Exception as e:
         print(f"Warning: Could not extract metadata from files: {e}")
         product = ""
@@ -826,7 +826,7 @@ def combine_and_plot_tiles(
     # Add title
     product_desc = interpret_timeliness(product)
     plt.title(
-        f"{upper_title}\nDate: {date}\nProduct: {product_desc}\nVariable: {variable_name}"
+        f"{upper_title}\ndate: {date}\nProduct: {product_desc}\nVariable: {variable_name}"
     )
 
     # Save the plot
@@ -871,7 +871,7 @@ def combine_and_plot_tiles(
 
         # Add title
         plt.title(
-            f"{upper_title}\nDate: {date}\nProduct: {product_desc}\nVariable: {variable_name}"
+            f"{upper_title}\ndate: {date}\nProduct: {product_desc}\nVariable: {variable_name}"
         )
 
         # Save the plot

@@ -73,8 +73,8 @@ def process_file(
         data["longitude"] = data["x"]
 
         # Create date variable (Julian and calendar format)
-        data = data.assign(Julian_Date=Julian_date)
-        data = data.assign(Date=Calendar_date)
+        data = data.assign(Julian_date=Julian_date)
+        data = data.assign(date=Calendar_date)
         data = data.assign(tile=Tile)
 
         data["latcorner0"] = pd.to_numeric(
@@ -147,7 +147,7 @@ def process_file(
         data = data[
             [
                 "filename",
-                "Date",
+                "date",
                 "loncorner0",
                 "latcorner0",
                 "loncorner1",
