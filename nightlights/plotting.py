@@ -607,7 +607,7 @@ def create_frame(data: xr.DataArray, date: str, variable_name: str, upper_title:
     plt.title(f'{upper_title}\nDate: {date}\nVariable: {variable_name}')
     
     # Save the frame
-    frame_path = os.path.join(output_dir, f"frame_{date.replace('-','')}.png")
+    frame_path = os.path.join(output_dir, f"frame_{date}.png")
     plt.savefig(frame_path, dpi=300, bbox_inches='tight')
     plt.close(fig)
     
