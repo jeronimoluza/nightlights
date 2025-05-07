@@ -39,9 +39,28 @@ def create_folium_map(gdf, variable_name, output_file, colormap='viridis'):
         bounds = gdf.geometry.total_bounds
         center_lat = (bounds[1] + bounds[3]) / 2
         center_lon = (bounds[0] + bounds[2]) / 2
-        zoom_level = 8
+        
+        # Calculate zoom level based on the bounding box size
+        # This uses a simple formula that works well for most geographic data
+        # The formula is based on the fact that each zoom level shows roughly 2x the area
+        
+        # Get the width and height in degrees
+        width = bounds[2] - bounds[0]  # longitude extent
+        height = bounds[3] - bounds[1]  # latitude extent
+        
+        # Use the larger dimension to determine zoom
+        max_dimension = max(width, height)
+        
+        # Calculate zoom using a logarithmic scale
+        # 360 degrees is the entire globe (zoom 0)
+        # We use log base 2 because each zoom level doubles the detail
+        zoom_level = int(np.log2(360 / max_dimension)) + 1
+        
+        # Clamp zoom level to reasonable values
+        zoom_level = max(5, min(zoom_level, 15))
+        
     except Exception as e:
-        print(f"Error calculating map center: {e}")
+        print(f"Error calculating map center and zoom: {e}")
         # Default to a reasonable center if there's an error
         center_lat, center_lon = -34.65, -59.43  # Default to region center
         zoom_level = 10
