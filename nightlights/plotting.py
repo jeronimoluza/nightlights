@@ -137,11 +137,11 @@ def plot_file(path:str, variable_name:str, output_dir:str):
 def interpret_timeliness(product):
     """Interprets the timeliness of the product."""
     if product == "VNP46A2":
-        product += " (Daily)"
+        product += " (Daily Nightlights)"
     elif product == "VNP46A3":
-        product += " (Monthly)"
+        product += " (Monthly Nightlights)"
     elif product == "VNP46A4":
-        product += " (Yearly)"
+        product += " (Yearly Nightlights)"
     return product
 
 def plot_all_files(files: list, variable_name: str, upper_title: str, output_dir: str, region=None):

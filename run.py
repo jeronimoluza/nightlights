@@ -4,7 +4,7 @@ if __name__ == "__main__":
 
     from nightlights import download, plotting, process
 
-    session_slug = "delhi"
+    session_slug = "main"
     download_dir = f"./data/{session_slug}/raw"
     extraction_dir = f"./data/{session_slug}/extracted"
     plot_dir = f"./data/{session_slug}/plots"
@@ -17,9 +17,8 @@ if __name__ == "__main__":
     end_date = "2024-12-31"
 
     region = wkt.loads(
-        "POLYGON((74.96 29.86, 79.49 29.86, 79.49 27.3, 74.96 27.3, 74.96 29.86))"
+        "POLYGON((5.9559 47.8084, 10.4921 47.8084, 10.4921 45.818, 5.9559 45.818, 5.9559 47.8084))"
     )
-    auth = download.login()
 
     files = download.download_earthaccess(
         download_dir=download_dir,
@@ -37,6 +36,9 @@ if __name__ == "__main__":
     # process.produce_output(extraction_dir, final_output_dir)
 
     plotting.plot_all_files(
-        files, variable_name=variable_name, upper_title="Delhi Area Nightlights", output_dir=plot_dir, region=region
+        files,
+        variable_name=variable_name,
+        upper_title="Title",
+        output_dir=plot_dir,
+        region=region,
     )
-

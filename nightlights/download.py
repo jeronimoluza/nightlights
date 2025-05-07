@@ -59,24 +59,31 @@ def get_bounding_box(region):
     )  # Return in (lower_left_lon, lower_left_lat, upper_right_lon, upper_right_lat) format
 
 
-def login():
+def earthaccess_login():
     """
     Logs the user in to earthaccess
     """
     return earthaccess.login()
 
+
 def get_file_date(file_path: str) -> str:
     """
     Extracts the date from the file name.
     """
-    julian_date = file_path.split("/")[-1].split(".")[1].replace('A', '')
-    return datetime.datetime.strptime(julian_date, '%Y%j').strftime('%Y-%m-%d')
+    julian_date = file_path.split("/")[-1].split(".")[1].replace("A", "")
+    return datetime.datetime.strptime(julian_date, "%Y%j").strftime("%Y-%m-%d")
+
 
 def is_in_date_range(file_date, start_date: str, end_date: str) -> bool:
     """
     Checks if the file date is within the specified date range.
     """
-    return pd.to_datetime(start_date) <= pd.to_datetime(file_date) <= pd.to_datetime(end_date)
+    return (
+        pd.to_datetime(start_date)
+        <= pd.to_datetime(file_date)
+        <= pd.to_datetime(end_date)
+    )
+
 
 def filter_granules(granules: list, start_date: str, end_date: str):
     """
@@ -87,9 +94,8 @@ def filter_granules(granules: list, start_date: str, end_date: str):
         file_date = get_file_date(g.data_links()[0])
         if is_in_date_range(file_date, start_date, end_date):
             filtered_granules.append(g)
-    if len(granules) != len(filtered_granules):
-        print(f"Filtered {len(granules) - len(filtered_granules)} granules.")
     return filtered_granules
+
 
 def download_earthaccess(
     download_dir: str,
@@ -118,6 +124,9 @@ def download_earthaccess(
     Returns:
     - list: A list of downloaded file paths.
     """
+
+    auth = earthaccess_login()
+
     bounding_box = get_bounding_box(region=region)
 
     download_dir = download_dir + f"/{short_name}_{version}"
@@ -133,8 +142,9 @@ def download_earthaccess(
         count=count,
     )
 
-    print(f"Found {len(granules)} granules.")
-    granules = filter_granules(granules=granules, start_date=start_date, end_date=end_date)
+    granules = filter_granules(
+        granules=granules, start_date=start_date, end_date=end_date
+    )
 
     if len(granules) == 0:
         return

@@ -2,12 +2,15 @@ from tqdm import tqdm
 import os
 import datetime
 import pandas as pd
+import geopandas as gpd
 import numpy as np
 import rioxarray as rxr
 from shapely import Polygon
 
 
-def process_file(path: str, variable_name: str, bounding_box: tuple = None) -> pd.DataFrame:
+def process_file(
+    path: str, variable_name: str, bounding_box: tuple = None
+) -> pd.DataFrame:
     """
     This function processes a raster file containing Black Marble data and returns a DataFrame with the extracted information.
 
@@ -53,9 +56,7 @@ def process_file(path: str, variable_name: str, bounding_box: tuple = None) -> p
             return df.drop("spatial_ref", axis=1).droplevel(level="band")
 
         def clean_column_name(colname):
-            return colname.replace(
-                prefix, ""
-            )
+            return colname.replace(prefix, "")
 
         variables = list(data_obj.var().variables)
         clean_names = [clean_column_name(col) for col in variables]
@@ -76,17 +77,33 @@ def process_file(path: str, variable_name: str, bounding_box: tuple = None) -> p
         data = data.assign(Date=Calendar_date)
         data = data.assign(tile=Tile)
 
-        data["latcorner0"] = pd.to_numeric(data["latitude"] - (lat_pixel_length / 2))
-        data["loncorner0"] = pd.to_numeric(data["longitude"] - (long_pixel_length / 2))
+        data["latcorner0"] = pd.to_numeric(
+            data["latitude"] - (lat_pixel_length / 2)
+        )
+        data["loncorner0"] = pd.to_numeric(
+            data["longitude"] - (long_pixel_length / 2)
+        )
 
-        data["latcorner1"] = pd.to_numeric(data["latitude"] - (lat_pixel_length / 2))
-        data["loncorner1"] = pd.to_numeric(data["longitude"] + (long_pixel_length / 2))
+        data["latcorner1"] = pd.to_numeric(
+            data["latitude"] - (lat_pixel_length / 2)
+        )
+        data["loncorner1"] = pd.to_numeric(
+            data["longitude"] + (long_pixel_length / 2)
+        )
 
-        data["latcorner2"] = pd.to_numeric(data["latitude"] + (lat_pixel_length / 2))
-        data["loncorner2"] = pd.to_numeric(data["longitude"] + (long_pixel_length / 2))
+        data["latcorner2"] = pd.to_numeric(
+            data["latitude"] + (lat_pixel_length / 2)
+        )
+        data["loncorner2"] = pd.to_numeric(
+            data["longitude"] + (long_pixel_length / 2)
+        )
 
-        data["latcorner3"] = pd.to_numeric(data["latitude"] + (lat_pixel_length / 2))
-        data["loncorner3"] = pd.to_numeric(data["longitude"] - (long_pixel_length / 2))
+        data["latcorner3"] = pd.to_numeric(
+            data["latitude"] + (lat_pixel_length / 2)
+        )
+        data["loncorner3"] = pd.to_numeric(
+            data["longitude"] - (long_pixel_length / 2)
+        )
 
         """ pyarrow won't write uint dtypes"""
         ints = data.select_dtypes(exclude=[float, object]).columns.tolist()
@@ -102,20 +119,22 @@ def process_file(path: str, variable_name: str, bounding_box: tuple = None) -> p
             axis=1,
         )
         data["filename"] = filename
-        
+
         # Filter by bounding box if provided
         if bounding_box is not None:
             min_lon, min_lat, max_lon, max_lat = bounding_box
-            lon_lat_filter = (
-                data["longitude"].between(min_lon, max_lon) & 
-                data["latitude"].between(min_lat, max_lat)
-            )
+            lon_lat_filter = data["longitude"].between(
+                min_lon, max_lon
+            ) & data["latitude"].between(min_lat, max_lat)
             data = data[lon_lat_filter]
 
-        data = data.drop([
-            "latitude",
-            "longitude",
-        ], axis=1)
+        data = data.drop(
+            [
+                "latitude",
+                "longitude",
+            ],
+            axis=1,
+        )
 
         data["variable_name"] = variable_name
         data = data.rename(columns={variable_name: "value"})
@@ -125,22 +144,25 @@ def process_file(path: str, variable_name: str, bounding_box: tuple = None) -> p
         data["value"] = data["value"].replace(fill_value, np.nan)
         data["value"] = data["value"] * scale_factor + offset_value
 
-        data = data[[
-            "filename",
-            "Date",
-            "loncorner0",
-            "latcorner0",
-            "loncorner1",
-            "latcorner1",
-            "loncorner2",
-            "latcorner2",
-            "loncorner3",
-            "latcorner3",
-            "value",
-            "variable_name",
-        ]]
+        data = data[
+            [
+                "filename",
+                "Date",
+                "loncorner0",
+                "latcorner0",
+                "loncorner1",
+                "latcorner1",
+                "loncorner2",
+                "latcorner2",
+                "loncorner3",
+                "latcorner3",
+                "value",
+                "variable_name",
+            ]
+        ]
 
         return data
+
 
 def corners_to_geometry(df):
     """
@@ -172,28 +194,51 @@ def corners_to_geometry(df):
     return df
 
 
-def process_files(list_of_files: list, variable_name: str, output_dir: str, bounding_box: tuple = None) -> None:
+def process_files(
+    list_of_files: list, variable_name: str, bounding_box: tuple = None
+) -> gpd.GeoDataFrame:
+    output = []
+    for file in list_of_files:
+        df = process_file(
+            file, variable_name=variable_name, bounding_box=bounding_box
+        )
+        output.append(df)
+
+    output = pd.concat(output).reset_index(drop=True)
+    gdf = corners_to_geometry(output)
+    return gdf
+
+
+def batch_process_files(
+    list_of_files: list,
+    variable_name: str,
+    extraction_dir: str,
+    output_dir: str,
+    bounding_box: tuple = None,
+) -> None:
+    os.makedirs(extraction_dir, exist_ok=True)
     os.makedirs(output_dir, exist_ok=True)
 
-    print(f"Processing {len(list_of_files)} files.")
+    print(f"Batch processing {len(list_of_files)} files.")
     for file in list_of_files:
         filename = file.split("/")[-1]
         output_file = filename.replace(".h5", ".csv")
-        df = process_file(file, variable_name=variable_name, bounding_box=bounding_box)
+        df = process_file(
+            file, variable_name=variable_name, bounding_box=bounding_box
+        )
         df = corners_to_geometry(df)
-        df.to_csv(f"{output_dir}/{output_file}", index=None)
+        df.to_csv(f"{extraction_dir}/{output_file}", index=None)
 
-    print(f"Processed files are in folder {output_dir}")
-
-def produce_output(extraction_dir: str, output_dir: str) -> None:
-    os.makedirs(output_dir, exist_ok=True)
-    
     files = os.listdir(extraction_dir)
     output = []
-    
+
     for file in files:
         df = pd.read_csv(f"{extraction_dir}/{file}")
-        output.append(df) 
-    
+        output.append(df)
+
     output = pd.concat(output)
     output.to_csv(f"{output_dir}/output.csv", index=None)
+    print("Batch processing completed")
+    print(f"Extracted files are at {extraction_dir}")
+    print(f"Output file is at {output_dir}")
+
