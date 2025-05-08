@@ -176,4 +176,3 @@ cython_debug/
 
 # Data
 data/**
-__main__.py
