@@ -11,10 +11,10 @@ if __name__ == "__main__":
     final_output_dir = "./data/output"
 
     # Define search parameters
-    short_name = "VNP46A3"
+    short_name = "VNP46A4"
     version = "1"
-    start_date = "2023-09-20"
-    end_date = "2024-01-20"
+    start_date = "2022-01-01"
+    end_date = "2023-01-31"
 
     # region = wkt.loads(
     #     # "POLYGON((33.0 14.89, 47.98 14.89, 47.98 3.4, 33.0 3.4, 33.0 14.89))"
@@ -23,10 +23,10 @@ if __name__ == "__main__":
     # )
 
     gdf = gpd.read_file(
-        "https://raw.githubusercontent.com/datasets/geo-countries/main/data/countries.geojson"
+        "https://raw.githubusercontent.com/datasets/geo-boundaries-world-110m/refs/heads/main/countries.geojson"
     )
     region_crs = gdf.crs.to_epsg()
-    region = gdf[gdf.name == "Lebanon"].geometry.values[0]
+    region = gdf[gdf.region_wb == "Latin America & Caribbean"].geometry.unary_union
 
     files = download.download_earthaccess(
         download_dir=download_dir,
@@ -37,7 +37,7 @@ if __name__ == "__main__":
         region=region,
     )
 
-    variable_name = "AllAngle_Composite_Snow_Covered"
+    variable_name = "AllAngle_Composite_Snow_Free"
     # variable_name = "DNB_BRDF-Corrected_NTL"
 
     # process.process_files(files, variable_name=variable_name, output_dir=extraction_dir, bounding_box=region.bounds)
@@ -52,17 +52,17 @@ if __name__ == "__main__":
     #     region=region,
     # )
 
-    # plotting.create_timelapse_gif(
-    #     files,
-    #     variable_name=variable_name,
-    #     title="Lebanon Blackouts\nMonthly Nightlights",
-    #     output_dir=plot_dir,
-    #     region=region,
-    #     fps=2.0,
-    #     plot_series=True,
-    # )
-
-    gdf = process.process_files(
-        files, variable_name=variable_name, region=region, region_crs=region_crs
+    plotting.create_timelapse_gif(
+        files,
+        variable_name=variable_name,
+        title="Latin America & Caribbean",
+        output_dir=plot_dir,
+        region=region,
+        region_crs=region_crs,
+        fps=2.0,
+        plot_series=True,
     )
-    gdf.to_csv("lebanon.csv", index=None)
+
+    # gdf = process.process_files(
+    #     files, variable_name=variable_name, region=region, region_crs=region_crs
+    # )

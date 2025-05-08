@@ -147,6 +147,7 @@ def download_earthaccess(
     )
 
     if len(granules) == 0:
+        print("No granules found.")
         return
     else:
         print(f"Downloading {len(granules)} granules.")

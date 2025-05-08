@@ -29,7 +29,7 @@ MAP_WATER_COLOR = "lightblue"   # Color for water bodies (ocean, lakes, rivers)
 
 
 def load_data_from_h5(
-    path: str, variable_name: str
+    path: str, variable_name: str, region=None, region_crs: int = 4326
 ) -> Tuple[np.ndarray, dict, xr.DataArray]:
     """
     Load raw data and metadata from an h5 file.
@@ -42,9 +42,43 @@ def load_data_from_h5(
         tuple: (data, metadata, data_obj) arrays and metadata for processing
     """
     with rxr.open_rasterio(path) as data_obj:
+
+            
         var_path = f"{PREFIX}{variable_name}"
         try:
-            data = data_obj[var_path].data
+            # Get the data first
+            data_var = data_obj[var_path]
+            fill_value = data_obj.attrs.get(f"{var_path}__FillValue")
+            
+            # Apply region clipping if provided
+            if region is not None:
+                # Use rio.clip to clip the data to the region
+                data_var = data_var.rio.clip([region], region_crs, drop=True)
+                
+                # Extract the data array and coordinates after clipping
+                data = data_var.data
+                
+                # Update the metadata to include the new coordinates
+                metadata = {
+                    "fill_value": fill_value,
+                    "scale_factor": data_obj.attrs.get(f"{var_path}_scale_factor", 1.0),
+                    "offset": data_obj.attrs.get(f"{var_path}_offset", 0.0),
+                    "product": data_obj.attrs.get("ShortName", ""),
+                    "date": data_obj.attrs.get("RangeBeginningdate", ""),
+                    "lons": data_var.x.values,  # Use clipped coordinates
+                    "lats": data_var.y.values,   # Use clipped coordinates
+                }
+                
+                # If we have a fill value, make sure it's properly applied
+                if fill_value is not None:
+                    # Create a mask for values that should be NaN
+                    mask = np.isclose(data, fill_value) | np.isnan(data)
+                    data = np.where(mask, np.nan, data)
+                    
+                # Return early with the clipped data and updated metadata
+                return data, metadata, data_var
+            else:
+                data = data_var.data
         except KeyError:
             raise ValueError(
                 f"Variable {variable_name} not found in file {path}\n"
@@ -68,7 +102,7 @@ def load_data_from_h5(
 
 
 def prepare_data(
-    path: str, variable_name: str, log_scale: bool = True
+    path: str, variable_name: str, log_scale: bool = True, region=None, region_crs: int = 4326
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     Extract and prepare data from an h5 file.
@@ -81,10 +115,11 @@ def prepare_data(
     Returns:
         tuple: (data, lons, lats) arrays for plotting
     """
-    data, metadata, _ = load_data_from_h5(path, variable_name)
+    data, metadata, _ = load_data_from_h5(path, variable_name, region, region_crs)
 
     # First replace fill values with NaN, then apply scaling and offset
-    data = np.where(data == metadata["fill_value"], np.nan, data)
+    if metadata["fill_value"] is not None:
+        data = np.where(np.isclose(data, metadata["fill_value"]) | np.isnan(data), np.nan, data)
     data = data * metadata["scale_factor"] + metadata["offset"]
 
     # Apply log scaling if requested
@@ -113,6 +148,24 @@ def create_dataarray_from_raw(
     Returns:
         xr.DataArray: DataArray with the data and coordinates
     """
+    # Make sure the dimensions match
+    if data.shape[0] != len(lats) or data.shape[1] != len(lons):
+        # If data shape doesn't match coordinates, we need to fix it
+        if isinstance(data, np.ndarray) and data.ndim == 2:
+            # If data is a 2D array, we can create new coordinates that match
+            print(f"Warning: Data shape {data.shape} doesn't match coordinates ({len(lats)}, {len(lons)}). Creating new coordinates.")
+            # Create new coordinate arrays that match the data dimensions
+            if len(lats) > 1 and len(lons) > 1:
+                lat_step = (lats[-1] - lats[0]) / (len(lats) - 1)
+                lon_step = (lons[-1] - lons[0]) / (len(lons) - 1)
+                new_lats = np.linspace(lats[0], lats[0] + lat_step * (data.shape[0] - 1), data.shape[0])
+                new_lons = np.linspace(lons[0], lons[0] + lon_step * (data.shape[1] - 1), data.shape[1])
+                lats, lons = new_lats, new_lons
+            else:
+                # If we have only one coordinate, we need to create a new array
+                lats = np.linspace(lats[0] if len(lats) > 0 else 0, lats[0] + 1 if len(lats) > 0 else 1, data.shape[0])
+                lons = np.linspace(lons[0] if len(lons) > 0 else 0, lons[0] + 1 if len(lons) > 0 else 1, data.shape[1])
+    
     return xr.DataArray(
         data, dims=["y", "x"], coords={"y": lats, "x": lons}, attrs=attrs or {}
     )
@@ -227,6 +280,8 @@ def plot_nightlights(
     cmap: str = DEFAULT_CMAP,
     vmin: float = None,
     vmax: float = None,
+    region=None,
+    region_crs: int = 4326,
 ) -> Tuple[plt.Figure, plt.Axes]:
     """
     Plot nightlights data from an h5 file using cartopy and matplotlib.
@@ -244,7 +299,7 @@ def plot_nightlights(
         tuple: (fig, ax) matplotlib figure and axis objects
     """
     # Extract data from the h5 file
-    data, lons, lats = prepare_data(file_path, variable_name, log_scale)
+    data, lons, lats = prepare_data(file_path, variable_name, log_scale, region, region_crs)
 
     # Create a figure with a map projection and common features
     fig, ax = setup_map_figure()
@@ -289,7 +344,7 @@ def plot_nightlights(
     return fig, ax
 
 
-def plot_file(path: str, variable_name: str, output_dir: str) -> bool:
+def plot_file(path: str, variable_name: str, output_dir: str, region=None, region_crs: int = 4326) -> bool:
     """Run the plotting function and save the result.
 
     Args:
@@ -306,7 +361,8 @@ def plot_file(path: str, variable_name: str, output_dir: str) -> bool:
 
         # Plot the file
         fig, ax = plot_nightlights(
-            file_path=path, variable_name=variable_name, output_dir=output_dir
+            file_path=path, variable_name=variable_name, output_dir=output_dir,
+            region=region, region_crs=region_crs
         )
 
         # Close the figure to free up memory
@@ -375,7 +431,7 @@ def plot_all_files(
     # 1. Plot individual tiles (all tiles, all dates)
     print(f"Plotting {len(files)} files individually...")
     for file in tqdm(files, desc="Plotting individual files"):
-        plot_file(file, variable_name, single_tiles_dir)
+        plot_file(file, variable_name, single_tiles_dir, region, region_crs=4326)
 
     # 2. Create combined plots for each date
     print("Creating combined plots for each date...")
@@ -437,6 +493,7 @@ def create_timelapse_gif(
     title: str,
     output_dir: str,
     region=None,
+    region_crs: int = 4326,
     fps: float = 5.0,
     plot_series: bool = False,
 ) -> None:
@@ -479,20 +536,22 @@ def create_timelapse_gif(
             files_by_date.items(), desc="Processing dates for min/max"
         ):
             # Process files for this date
-            combined_data = process_files_for_date(date_files, variable_name)
+            combined_data = process_files_for_date(date_files, variable_name, region, region_crs)
             if combined_data is None:
                 print(f"Warning: No valid data for date {date}, skipping")
                 continue
 
-            # Apply region filtering
-            min_lon, min_lat, max_lon, max_lat = region.bounds
-            mask = (
-                (combined_data.x < min_lon)
-                | (combined_data.x > max_lon)
-                | (combined_data.y < min_lat)
-                | (combined_data.y > max_lat)
-            )
-            filtered_data = combined_data.where(~mask)
+            # We've already applied region clipping in process_files_for_date
+            # Just use the data as is
+            filtered_data = combined_data
+            
+            # Make sure any remaining fill values are properly masked
+            if not np.isnan(filtered_data.min()):
+                # Check for suspiciously high values that might be fill values
+                # This is a fallback in case the fill value wasn't properly handled earlier
+                suspicious_values = filtered_data > filtered_data.quantile(0.99) * 10
+                if suspicious_values.any():
+                    filtered_data = filtered_data.where(~suspicious_values)
 
             date_data_dict[date] = filtered_data
 
@@ -519,6 +578,7 @@ def create_timelapse_gif(
                 title,
                 timelapse_dir,
                 region,
+                region_crs,
                 global_min,
                 global_max,
                 plot_series=plot_series,
@@ -538,7 +598,7 @@ def create_timelapse_gif(
 
 
 def process_files_for_date(
-    files: List[str], variable_name: str, region=None
+    files: List[str], variable_name: str, region=None, region_crs: int = 4326
 ) -> xr.DataArray:
     """Process files for a specific date and return combined data.
 
@@ -556,7 +616,7 @@ def process_files_for_date(
         try:
             # Extract data and prepare it
             data, lons, lats = prepare_data(
-                file, variable_name, log_scale=True
+                file, variable_name, log_scale=True, region=region, region_crs=region_crs
             )
 
             # Create xarray DataArray
@@ -573,16 +633,6 @@ def process_files_for_date(
         except Exception as e:
             print(f"Error processing file {file}: {e}")
 
-    # Apply region filtering if provided
-    if region is not None and combined_data is not None:
-        min_lon, min_lat, max_lon, max_lat = region.bounds
-        mask = (
-            (combined_data.x < min_lon)
-            | (combined_data.x > max_lon)
-            | (combined_data.y < min_lat)
-            | (combined_data.y > max_lat)
-        )
-        combined_data = combined_data.where(~mask)
 
     return combined_data
 
@@ -593,6 +643,7 @@ def process_and_plot_date(
     title: str,
     output_path: str,
     region=None,
+    region_crs: int = 4326,
 ) -> xr.DataArray:
     """Process files for a specific date and create a plot.
 
@@ -607,7 +658,7 @@ def process_and_plot_date(
         xarray.DataArray: Combined data for the date
     """
     # Process and combine the files
-    combined_data = process_files_for_date(files, variable_name)
+    combined_data = process_files_for_date(files, variable_name, region, region_crs)
 
     if combined_data is None:
         print(f"Warning: No valid data found for plot {output_path}")
@@ -710,6 +761,7 @@ def create_frame(
     title: str,
     output_dir: str,
     region=None,
+    region_crs: int = 4326,
     vmin: float = None,
     vmax: float = None,
     plot_series: bool = False,
@@ -890,6 +942,7 @@ def combine_and_plot_tiles(
     title: str,
     output_dir: str,
     region=None,
+    region_crs: int = 4326,
 ) -> xr.DataArray:
     """
     Combine data from all tiles, filter by region if provided, and create plots.
@@ -910,7 +963,7 @@ def combine_and_plot_tiles(
 
     # Process and combine all files
     print("Combining tiles...")
-    combined_data = process_files_for_date(files, variable_name)
+    combined_data = process_files_for_date(files, variable_name, region, region_crs)
 
     if combined_data is None:
         print("Error: Failed to combine tiles. No valid data found.")
