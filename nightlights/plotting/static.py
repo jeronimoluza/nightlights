@@ -344,7 +344,7 @@ def interpret_timeliness(product: str) -> str:
 def plot_all_files(
     files: List[str],
     variable_name: str,
-    upper_title: str,
+    title: str,
     output_dir: str,
     region=None,
 ) -> None:
@@ -353,7 +353,7 @@ def plot_all_files(
     Args:
         files (list): List of h5 file paths
         variable_name (str): Name of the variable to plot
-        upper_title (str): Title to display at the top of the plot
+        title (str): Title to display at the top of the plot
         output_dir (str): Directory to save the plots
         region (shapely.geometry.Polygon, optional): Region to filter by
     """
@@ -389,7 +389,7 @@ def plot_all_files(
         combined_data = process_and_plot_date(
             date_files,
             variable_name,
-            f"{upper_title}\ndate: {date}",
+            f"{title}\ndate: {date}",
             date_output_path,
             None,  # No region filtering
         )
@@ -403,7 +403,7 @@ def plot_all_files(
             filter_and_plot_region(
                 combined_data,
                 variable_name,
-                f"{upper_title}\ndate: {date}",
+                f"{title}\ndate: {date}",
                 filtered_output_path,
                 region,
             )
@@ -434,7 +434,7 @@ def group_files_by_date(files: List[str]) -> Dict[str, List[str]]:
 def create_timelapse_gif(
     files: List[str],
     variable_name: str,
-    upper_title: str,
+    title: str,
     output_dir: str,
     region=None,
     fps: float = 5.0,
@@ -445,7 +445,7 @@ def create_timelapse_gif(
     Args:
         files_by_date (dict): Dictionary mapping dates to lists of files
         variable_name (str): Name of the variable to extract and plot
-        upper_title (str): Title to display at the top of the plot
+        title (str): Title to display at the top of the plot
         output_dir (str): Directory to save the plots and GIF
         region (shapely.geometry.Polygon): Region to filter by (required)
         fps (float): Frames per second for the GIF
@@ -516,7 +516,7 @@ def create_timelapse_gif(
                 filtered_data,
                 date,
                 variable_name,
-                upper_title,
+                title,
                 timelapse_dir,
                 region,
                 global_min,
@@ -707,7 +707,7 @@ def create_frame(
     data: xr.DataArray,
     date: str,
     variable_name: str,
-    upper_title: str,
+    title: str,
     output_dir: str,
     region=None,
     vmin: float = None,
@@ -722,7 +722,7 @@ def create_frame(
         data (xarray.DataArray): Data to plot
         date (str): date string for the frame
         variable_name (str): Name of the variable being plotted
-        upper_title (str): Title to display at the top of the plot
+        title (str): Title to display at the top of the plot
         output_dir (str): Directory to save the frame
         region (shapely.geometry.Polygon, optional): Region used for filtering
         vmin (float): Minimum value for color scaling
@@ -802,7 +802,7 @@ def create_frame(
 
     # Add title to the map
     if plot_series and all_dates and all_data:
-        ax.set_title(f"{upper_title}\ndate: {date}\nVariable: {variable_name}")
+        ax.set_title(f"{title}\ndate: {date}\nVariable: {variable_name}")
         
         # Create line plot for mean and median values across all dates
         date_objects = []
@@ -857,7 +857,7 @@ def create_frame(
             plt.tight_layout()
     else:
         # Add title for single plot
-        plt.title(f"{upper_title}\ndate: {date}\nVariable: {variable_name}")
+        plt.title(f"{title}\ndate: {date}\nVariable: {variable_name}")
 
     # Save the frame
     frame_path = os.path.join(output_dir, f"frame_{date.replace('-','')}.png")
@@ -887,7 +887,7 @@ def create_gif(
 def combine_and_plot_tiles(
     files: List[str],
     variable_name: str,
-    upper_title: str,
+    title: str,
     output_dir: str,
     region=None,
 ) -> xr.DataArray:
@@ -897,7 +897,7 @@ def combine_and_plot_tiles(
     Args:
         files (list): List of h5 file paths to combine
         variable_name (str): Name of the variable to extract and plot
-        upper_title (str): Title to display at the top of the plot
+        title (str): Title to display at the top of the plot
         output_dir (str): Directory to save the plots
         region (shapely.geometry.Polygon, optional): Region to filter by
 
@@ -948,7 +948,7 @@ def combine_and_plot_tiles(
     # Add title
     product_desc = interpret_timeliness(product)
     plt.title(
-        f"{upper_title}\ndate: {date}\nProduct: {product_desc}\nVariable: {variable_name}"
+        f"{title}\ndate: {date}\nProduct: {product_desc}\nVariable: {variable_name}"
     )
 
     # Save the plot
@@ -993,7 +993,7 @@ def combine_and_plot_tiles(
 
         # Add title
         plt.title(
-            f"{upper_title}\ndate: {date}\nProduct: {product_desc}\nVariable: {variable_name}"
+            f"{title}\ndate: {date}\nProduct: {product_desc}\nVariable: {variable_name}"
         )
 
         # Save the plot

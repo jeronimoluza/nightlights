@@ -11,14 +11,15 @@ if __name__ == "__main__":
     final_output_dir = f"./data/{session_slug}/output"
 
     # Define search parameters
-    short_name = "VNP46A3"
-    version = "1"
-    start_date = "2024-01-01"
-    end_date = "2025-03-30"
+    short_name = "VNP46A2"
+    version = "2"
+    start_date = "2025-04-20"
+    end_date = "2025-05-5"
 
     region = wkt.loads(
         # "POLYGON((33.0 14.89, 47.98 14.89, 47.98 3.4, 33.0 3.4, 33.0 14.89))"
-        "POLYGON((34.8826 34.6924, 36.625 34.6924, 36.625 33.055, 34.8826 33.055, 34.8826 34.6924))"
+        # "POLYGON((34.8826 34.6924, 36.625 34.6924, 36.625 33.055, 34.8826 33.055, 34.8826 34.6924))"
+        "POLYGON((-4.71 41.04, -2.63 41.04, -2.63 39.71, -4.71 39.71, -4.71 41.04))"
     )
 
     files = download.download_earthaccess(
@@ -30,8 +31,8 @@ if __name__ == "__main__":
         region=region,
     )
 
-    variable_name = "AllAngle_Composite_Snow_Free"
-    # variable_name = "DNB_BRDF-Corrected_NTL"
+    # variable_name = "AllAngle_Composite_Snow_Free"
+    variable_name = "DNB_BRDF-Corrected_NTL"
 
     # process.process_files(files, variable_name=variable_name, output_dir=extraction_dir, bounding_box=region.bounds)
 
@@ -40,7 +41,7 @@ if __name__ == "__main__":
     # plotting.plot_all_files(
     #     files,
     #     variable_name=variable_name,
-    #     upper_title="Title",
+    #     title="Title",
     #     output_dir=plot_dir,
     #     region=region,
     # )
@@ -48,11 +49,11 @@ if __name__ == "__main__":
     plotting.static.create_timelapse_gif(
         files,
         variable_name=variable_name,
-        upper_title="Lebanon Blackouts\nMonthly Nightlights",
+        title="Lebanon Blackouts\nMonthly Nightlights",
         output_dir=plot_dir,
         region=region,
         fps=2.0,
-        # plot_series=True,
+        plot_series=True,
     )
 
     # gdf = process.process_files(
