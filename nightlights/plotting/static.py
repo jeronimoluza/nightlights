@@ -19,6 +19,14 @@ PREFIX = "HDFEOS_GRIDS_VIIRS_Grid_DNB_2d_Data_Fields_"
 DEFAULT_CMAP = "cividis"
 DEFAULT_BUFFER = 0.5  # degrees
 
+# Map styling parameters
+MAP_BACKGROUND_COLOR = "white"  # Background color for cartopy maps
+MAP_COASTLINE_COLOR = "black"   # Color for coastlines
+MAP_BORDER_COLOR = "gray"       # Color for country borders
+MAP_STATE_COLOR = "gray"        # Color for state/province borders
+MAP_GRID_COLOR = "gray"         # Color for gridlines
+MAP_WATER_COLOR = "lightblue"   # Color for water bodies (ocean, lakes, rivers)
+
 
 def load_data_from_h5(
     path: str, variable_name: str
@@ -124,17 +132,25 @@ def setup_map_figure(
     """
     fig = plt.figure(figsize=figsize)
     ax = plt.axes(projection=ccrs.PlateCarree())
+    
+    # Set background color
+    ax.set_facecolor(MAP_BACKGROUND_COLOR)
+
+    # Add water bodies
+    ax.add_feature(cfeature.OCEAN, facecolor=MAP_WATER_COLOR)
+    ax.add_feature(cfeature.LAKES, facecolor=MAP_WATER_COLOR)
+    ax.add_feature(cfeature.RIVERS, edgecolor=MAP_WATER_COLOR, linewidth=0.5)
 
     # Add coastlines, borders, and other features
-    ax.coastlines(resolution="10m", color="black", linewidth=0.5)
-    ax.add_feature(cfeature.BORDERS, linewidth=0.3, edgecolor="gray")
-    ax.add_feature(cfeature.STATES, linewidth=0.2, edgecolor="gray")
+    ax.coastlines(resolution="10m", color=MAP_COASTLINE_COLOR, linewidth=0.5)
+    ax.add_feature(cfeature.BORDERS, linewidth=0.3, edgecolor=MAP_BORDER_COLOR)
+    ax.add_feature(cfeature.STATES, linewidth=0.2, edgecolor=MAP_STATE_COLOR)
 
     # Add gridlines
     gl = ax.gridlines(
         draw_labels=True,
         linewidth=0.5,
-        color="gray",
+        color=MAP_GRID_COLOR,
         alpha=0.5,
         linestyle="--",
     )
