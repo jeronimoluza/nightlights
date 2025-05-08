@@ -381,7 +381,8 @@ def plot_all_files(
         # If region is provided, create filtered version for this date
         if region is not None and combined_data is not None:
             filtered_output_path = os.path.join(
-                combined_dir, f"combined_{date.replace('-','')}_region_filtered.png"
+                combined_dir,
+                f"combined_{date.replace('-','')}_region_filtered.png",
             )
             filter_and_plot_region(
                 combined_data,
@@ -390,8 +391,6 @@ def plot_all_files(
                 filtered_output_path,
                 region,
             )
-
-
 
 
 def group_files_by_date(files: List[str]) -> Dict[str, List[str]]:
@@ -408,7 +407,7 @@ def group_files_by_date(files: List[str]) -> Dict[str, List[str]]:
     for file in tqdm(files, desc="Grouping files by date"):
         try:
             with rxr.open_rasterio(file) as data_obj:
-                date = data_obj.attrs.get("RangeBeginningdate", "unknown")
+                date = data_obj.attrs.get("RangeBeginningDate", "unknown")
                 files_by_date[date].append(file)
         except Exception as e:
             print(f"Error reading date from {file}: {e}")
@@ -422,7 +421,7 @@ def create_timelapse_gif(
     upper_title: str,
     output_dir: str,
     region=None,
-    duration: float = 5.0,
+    fps: float = 5.0,
 ) -> None:
     """Create a timelapse GIF from multiple dates of data, using only region-filtered data.
 
@@ -432,14 +431,14 @@ def create_timelapse_gif(
         upper_title (str): Title to display at the top of the plot
         output_dir (str): Directory to save the plots and GIF
         region (shapely.geometry.Polygon): Region to filter by (required)
-        duration (float): Duration of each frame in seconds
+        fps (float): Frames per second for the GIF
     """
-        # Create output directory if it doesn't exist
+    # Create output directory if it doesn't exist
     os.makedirs(output_dir, exist_ok=True)
 
     # Group files by date for processing
     files_by_date = group_files_by_date(files)
-        # 3. Create timelapse GIF if we have multiple dates
+    # 3. Create timelapse GIF if we have multiple dates
     if len(files_by_date) > 1 and region is not None:
         print(f"Creating timelapse GIF from {len(files_by_date)} dates...")
         print(f"Found {len(files_by_date)} different dates in the data.")
@@ -513,7 +512,7 @@ def create_timelapse_gif(
 
         # Create the GIF
         gif_path = os.path.join(output_dir, f"timelapse_{variable_name}.gif")
-        create_gif(frame_paths, gif_path, duration)
+        create_gif(frame_paths, gif_path, fps)
         print(f"Timelapse GIF created at: {gif_path}")
 
 
@@ -746,18 +745,18 @@ def create_frame(
 
 
 def create_gif(
-    frame_paths: List[str], output_path: str, duration: float = 1.0
+    frame_paths: List[str], output_path: str, fps: float = 1.0
 ) -> None:
     """Create a GIF from a list of image paths.
 
     Args:
         frame_paths (list): List of paths to frame images
         output_path (str): Path to save the GIF
-        duration (float): Duration of each frame in seconds
+        fps (float): Frames per second for the GIF
     """
     try:
         images = [imageio.imread(frame) for frame in frame_paths]
-        imageio.mimsave(output_path, images, duration=duration, loop=0)
+        imageio.mimsave(output_path, images, fps=fps, loop=0)
     except Exception as e:
         print(f"Error creating GIF: {e}")
 
@@ -885,4 +884,3 @@ def combine_and_plot_tiles(
         return combined_data_filtered
     else:
         return combined_data
-

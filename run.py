@@ -13,11 +13,12 @@ if __name__ == "__main__":
     # Define search parameters
     short_name = "VNP46A3"
     version = "1"
-    start_date = "2024-05-01"
-    end_date = "2024-05-31"
+    start_date = "2024-01-01"
+    end_date = "2025-03-30"
 
     region = wkt.loads(
-        "POLYGON((-59.1165 -34.3782, -57.8715 -34.3782, -57.8715 -34.9739, -59.1165 -34.9739, -59.1165 -34.3782))"
+        # "POLYGON((33.0 14.89, 47.98 14.89, 47.98 3.4, 33.0 3.4, 33.0 14.89))"
+        "POLYGON((34.8826 34.6924, 36.625 34.6924, 36.625 33.055, 34.8826 33.055, 34.8826 34.6924))"
     )
 
     files = download.download_earthaccess(
@@ -44,13 +45,19 @@ if __name__ == "__main__":
     #     region=region,
     # )
 
-    # plotting.create_timelapse_gif(
-    #     files,
-    #     variable_name=variable_name,
-    #     upper_title="Title",
-    #     output_dir=plot_dir,
-    #     region=region,
-    # )
+    plotting.static.create_timelapse_gif(
+        files,
+        variable_name=variable_name,
+        upper_title="Lebanon Blackouts\nMonthly Nightlights",
+        output_dir=plot_dir,
+        region=region,
+        fps=2.0,
+    )
 
-    gdf = process.process_files(files, variable_name=variable_name, bounding_box=region.bounds)
-    plotting.interactive.create_folium_map(gdf, variable_name=variable_name, output_file="test.html")
+    # gdf = process.process_files(
+    #     files, variable_name=variable_name, bounding_box=region.bounds
+    # )
+    # plotting.interactive.create_folium_map(
+    #     gdf, variable_name=variable_name, output_file="test.html"
+    # )
+    #
