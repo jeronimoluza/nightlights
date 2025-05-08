@@ -52,6 +52,7 @@ if __name__ == "__main__":
         output_dir=plot_dir,
         region=region,
         fps=2.0,
+        # plot_series=True,
     )
 
     # gdf = process.process_files(

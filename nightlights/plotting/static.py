@@ -17,7 +17,7 @@ from typing import Dict, List, Tuple, Union, Optional
 # Constants
 PREFIX = "HDFEOS_GRIDS_VIIRS_Grid_DNB_2d_Data_Fields_"
 DEFAULT_CMAP = "cividis"
-DEFAULT_BUFFER = 0.5  # degrees
+DEFAULT_BUFFER = 0.2  # degrees
 
 # Map styling parameters
 MAP_BACKGROUND_COLOR = "white"  # Background color for cartopy maps
@@ -213,9 +213,9 @@ def add_colorbar(
     """
     cbar = plt.colorbar(mesh, ax=ax, pad=0.01, shrink=0.8)
     if log_scale:
-        cbar.set_label(f"{variable_name} Value (log scale)")
+        cbar.set_label(f"Log radiance (nW·cm$^{-2}$·sr$^{-1}$)")
     else:
-        cbar.set_label(f"{variable_name} Value")
+        cbar.set_label(f"Radiance (nW·cm$^{-2}$·sr$^{-1}$)")
     return cbar
 
 
@@ -438,6 +438,7 @@ def create_timelapse_gif(
     output_dir: str,
     region=None,
     fps: float = 5.0,
+    plot_series: bool = False,
 ) -> None:
     """Create a timelapse GIF from multiple dates of data, using only region-filtered data.
 
@@ -448,6 +449,7 @@ def create_timelapse_gif(
         output_dir (str): Directory to save the plots and GIF
         region (shapely.geometry.Polygon): Region to filter by (required)
         fps (float): Frames per second for the GIF
+        plot_series (bool): If True, show lineplots of data values for all dates below the map
     """
     # Create output directory if it doesn't exist
     os.makedirs(output_dir, exist_ok=True)
@@ -519,6 +521,9 @@ def create_timelapse_gif(
                 region,
                 global_min,
                 global_max,
+                plot_series=plot_series,
+                all_dates=sorted_dates,
+                all_data=date_data_dict,
             )
             frame_paths.append(frame_path)
 
@@ -707,6 +712,9 @@ def create_frame(
     region=None,
     vmin: float = None,
     vmax: float = None,
+    plot_series: bool = False,
+    all_dates: List[str] = None,
+    all_data: Dict[str, xr.DataArray] = None,
 ) -> str:
     """Create a single frame for the timelapse.
 
@@ -719,6 +727,9 @@ def create_frame(
         region (shapely.geometry.Polygon, optional): Region used for filtering
         vmin (float): Minimum value for color scaling
         vmax (float): Maximum value for color scaling
+        plot_series (bool): If True, show lineplots of data values for all dates below the map
+        all_dates (List[str]): List of all dates in the timelapse (required if plot_series is True)
+        all_data (Dict[str, xr.DataArray]): Dictionary of all data by date (required if plot_series is True)
 
     Returns:
         str: Path to the saved frame image
@@ -726,8 +737,48 @@ def create_frame(
     # Format date for display
     date = datetime.strptime(date, "%Y-%m-%d").strftime("%Y-%m-%d")
 
-    # Create the plot with common features
-    fig, ax = setup_map_figure()
+    if plot_series and all_dates and all_data:
+        # Create figure with two subplots - map on top, line plot on bottom
+        fig = plt.figure(figsize=(12, 12))
+        
+        # Create a simple 2-row grid with height ratios 3:1
+        gs = plt.GridSpec(2, 1, figure=fig, height_ratios=[5, 1])
+        
+        # Map subplot takes up 75% of the height
+        ax_map = fig.add_subplot(gs[0], projection=ccrs.PlateCarree())
+        
+        # Line plot subplot takes up 25% of the height
+        ax_box = fig.add_subplot(gs[1])
+        
+        # Set up map features on the map subplot
+        ax_map.set_facecolor(MAP_BACKGROUND_COLOR)
+        
+        # Add water bodies
+        ax_map.add_feature(cfeature.OCEAN, facecolor=MAP_WATER_COLOR)
+        ax_map.add_feature(cfeature.LAKES, facecolor=MAP_WATER_COLOR)
+        ax_map.add_feature(cfeature.RIVERS, edgecolor=MAP_WATER_COLOR, linewidth=0.5)
+        
+        # Add coastlines, borders, and other features
+        ax_map.coastlines(resolution="10m", color=MAP_COASTLINE_COLOR, linewidth=0.5)
+        ax_map.add_feature(cfeature.BORDERS, linewidth=0.3, edgecolor=MAP_BORDER_COLOR)
+        ax_map.add_feature(cfeature.STATES, linewidth=0.2, edgecolor=MAP_STATE_COLOR)
+        
+        # Add gridlines
+        gl = ax_map.gridlines(
+            draw_labels=True,
+            linewidth=0.5,
+            color=MAP_GRID_COLOR,
+            alpha=0.5,
+            linestyle="--",
+        )
+        gl.top_labels = False
+        gl.right_labels = False
+        
+        # Use ax_map for the map
+        ax = ax_map
+    else:
+        # Create the plot with common features (single plot)
+        fig, ax = setup_map_figure()
 
     # Plot the data with consistent color scaling
     mesh = ax.pcolormesh(
@@ -749,8 +800,64 @@ def create_frame(
     else:
         set_map_extent(ax, data)
 
-    # Add title
-    plt.title(f"{upper_title}\ndate: {date}\nVariable: {variable_name}")
+    # Add title to the map
+    if plot_series and all_dates and all_data:
+        ax.set_title(f"{upper_title}\ndate: {date}\nVariable: {variable_name}")
+        
+        # Create line plot for mean and median values across all dates
+        date_objects = []
+        mean_values = []
+        median_values = []
+        
+        # Get data values for each date
+        for d in all_dates:
+            # Get non-NaN values for this date
+            values = all_data[d].values.flatten()
+            values = values[~np.isnan(values)]
+            if len(values) > 0:
+                # Apply log transformation to match the map data
+                # Add 1 to avoid log(0) just like in prepare_data function
+                #values = np.log(values + 1)
+                
+                # Convert date string to datetime object for proper plotting
+                date_obj = datetime.strptime(d, "%Y-%m-%d")
+                date_objects.append(date_obj)
+                
+                # Calculate mean and median
+                mean_values.append(np.mean(values))
+                median_values.append(np.median(values))
+        
+        # Create line plot if we have data
+        if date_objects and mean_values and median_values:
+            # Plot mean values in red
+            ax_box.plot(date_objects, mean_values, 'r-', linewidth=2, label='Mean')
+            
+            # Plot median values in blue
+            ax_box.plot(date_objects, median_values, 'b-', linewidth=2, label='Median')
+            
+            # Add vertical line for current date
+            current_date_obj = datetime.strptime(date, "%Y-%m-%d")
+            ax_box.axvline(x=current_date_obj, color='gray', linestyle='--', linewidth=1.5, 
+                          label='Current Date')
+            
+            # Format x-axis to show dates nicely
+            ax_box.xaxis.set_major_formatter(plt.matplotlib.dates.DateFormatter('%Y-%m-%d'))
+            plt.setp(ax_box.get_xticklabels(), rotation=45, ha='right')
+            
+            # Add legend, title and labels
+            ax_box.legend(loc='best')
+            ax_box.set_title('Mean and Median Values Over Time')
+            ax_box.set_ylabel(f'Radiance (nW·cm$^{-2}$·sr$^{-1}$)')
+            ax_box.set_xlabel('Date')
+            
+            # Add grid for better readability
+            ax_box.grid(True, linestyle='--', alpha=0.7)
+            
+            # Adjust layout
+            plt.tight_layout()
+    else:
+        # Add title for single plot
+        plt.title(f"{upper_title}\ndate: {date}\nVariable: {variable_name}")
 
     # Save the frame
     frame_path = os.path.join(output_dir, f"frame_{date.replace('-','')}.png")
