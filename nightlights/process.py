@@ -5,11 +5,11 @@ import pandas as pd
 import geopandas as gpd
 import numpy as np
 import rioxarray as rxr
-from shapely import Polygon
+from shapely import Polygon, MultiPolygon
 
 
 def process_file(
-    path: str, variable_name: str, bounding_box: tuple = None
+    path: str, variable_name: str, region: Polygon | MultiPolygon = None, region_crs: int = 4326
 ) -> pd.DataFrame:
     """
     This function processes a raster file containing Black Marble data and returns a DataFrame with the extracted information.
@@ -52,9 +52,6 @@ def process_file(
             NorthBoundCoord - SouthBoundCoord
         ) / latitude_pixels
 
-        def _prestep_clean(df):
-            return df.drop("spatial_ref", axis=1).droplevel(level="band")
-
         def clean_column_name(colname):
             return colname.replace(prefix, "")
 
@@ -63,9 +60,17 @@ def process_file(
 
         cleaner = dict(zip(variables, clean_names))
 
+        fill_value = data_obj.attrs[f"{prefix}{variable_name}__FillValue"]
+        scale_factor = data_obj.attrs[f"{prefix}{variable_name}_scale_factor"]
+        offset_value = data_obj.attrs[f"{prefix}{variable_name}_offset"]
+        data_obj = data_obj[f"{prefix}{variable_name}"].squeeze()
+
+        if region is not None:
+            data_obj = data_obj.rio.clip([region], region_crs, drop=True)
+
         data = (
             data_obj.to_dataframe()
-            .rename(columns=cleaner)[sorted(clean_names)]
+            .rename(columns=cleaner)
             .reset_index()
         )
 
@@ -120,14 +125,6 @@ def process_file(
         )
         data["filename"] = filename
 
-        # Filter by bounding box if provided
-        if bounding_box is not None:
-            min_lon, min_lat, max_lon, max_lat = bounding_box
-            lon_lat_filter = data["longitude"].between(
-                min_lon, max_lon
-            ) & data["latitude"].between(min_lat, max_lat)
-            data = data[lon_lat_filter]
-
         data = data.drop(
             [
                 "latitude",
@@ -138,9 +135,6 @@ def process_file(
 
         data["variable_name"] = variable_name
         data = data.rename(columns={variable_name: "value"})
-        fill_value = data_obj.attrs[f"{prefix}{variable_name}__FillValue"]
-        scale_factor = data_obj.attrs[f"{prefix}{variable_name}_scale_factor"]
-        offset_value = data_obj.attrs[f"{prefix}{variable_name}_offset"]
         data["value"] = data["value"].replace(fill_value, np.nan)
         data["value"] = data["value"] * scale_factor + offset_value
 
@@ -195,12 +189,12 @@ def corners_to_geometry(df):
 
 
 def process_files(
-    list_of_files: list, variable_name: str, bounding_box: tuple = None
+    list_of_files: list, variable_name: str, region: Polygon | MultiPolygon = None, region_crs: int = 4326
 ) -> gpd.GeoDataFrame:
     output = []
     for file in list_of_files:
         df = process_file(
-            file, variable_name=variable_name, bounding_box=bounding_box
+            file, variable_name=variable_name, region=region, region_crs=region_crs
         )
         output.append(df)
 
@@ -214,7 +208,7 @@ def batch_process_files(
     variable_name: str,
     extraction_dir: str,
     output_dir: str,
-    bounding_box: tuple = None,
+    region: Polygon | MultiPolygon = None, region_crs: int = 4326
 ) -> None:
     os.makedirs(extraction_dir, exist_ok=True)
     os.makedirs(output_dir, exist_ok=True)
@@ -224,7 +218,7 @@ def batch_process_files(
         filename = file.split("/")[-1]
         output_file = filename.replace(".h5", ".csv")
         df = process_file(
-            file, variable_name=variable_name, bounding_box=bounding_box
+            file, variable_name=variable_name, region=region, region_crs=region_crs
         )
         df = corners_to_geometry(df)
         df.to_csv(f"{extraction_dir}/{output_file}", index=None)

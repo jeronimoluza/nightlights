@@ -37,7 +37,7 @@ if __name__ == "__main__":
         region=region,
     )
 
-    variable_name = "AllAngle_Composite_Snow_Free"
+    variable_name = "AllAngle_Composite_Snow_Covered"
     # variable_name = "DNB_BRDF-Corrected_NTL"
 
     # process.process_files(files, variable_name=variable_name, output_dir=extraction_dir, bounding_box=region.bounds)
@@ -52,16 +52,17 @@ if __name__ == "__main__":
     #     region=region,
     # )
 
-    plotting.create_timelapse_gif(
-        files,
-        variable_name=variable_name,
-        title="Lebanon Blackouts\nMonthly Nightlights",
-        output_dir=plot_dir,
-        region=region,
-        fps=2.0,
-        plot_series=True,
-    )
-
-    # gdf = process.process_files(
-    #     files, variable_name=variable_name, bounding_box=region.bounds
+    # plotting.create_timelapse_gif(
+    #     files,
+    #     variable_name=variable_name,
+    #     title="Lebanon Blackouts\nMonthly Nightlights",
+    #     output_dir=plot_dir,
+    #     region=region,
+    #     fps=2.0,
+    #     plot_series=True,
     # )
+
+    gdf = process.process_files(
+        files, variable_name=variable_name, region=region, region_crs=region_crs
+    )
+    gdf.to_csv("lebanon.csv", index=None)
