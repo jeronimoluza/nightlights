@@ -58,7 +58,6 @@ if __name__ == "__main__":
         title="Lebanon Blackouts\nMonthly Nightlights",
         output_dir=plot_dir,
         region=region,
-        region_crs=region_crs,
         fps=2.0,
         plot_series=True,
     )
