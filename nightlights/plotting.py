@@ -12,6 +12,9 @@ from collections import defaultdict
 import imageio.v2 as imageio
 from datetime import datetime
 from typing import Dict, List, Tuple, Union, Optional
+import seaborn as sns
+import pandas as pd
+import matplotlib.pyplot as plt
 
 
 # Constants
@@ -427,17 +430,22 @@ def create_timelapse_gif(
     region_crs: int = 4326,
     fps: float = 5.0,
     plot_series: bool = False,
+    use_confidence_interval: bool = False,
+    confidence_level: float = 0.95,
 ) -> None:
     """Create a timelapse GIF from multiple dates of data, using only region-filtered data.
 
     Args:
-        files_by_date (dict): Dictionary mapping dates to lists of files
+        files (List[str]): List of file paths to process
         variable_name (str): Name of the variable to extract and plot
         title (str): Title to display at the top of the plot
         output_dir (str): Directory to save the plots and GIF
         region (shapely.geometry.Polygon): Region to filter by (required)
+        region_crs (int): Coordinate reference system of the region
         fps (float): Frames per second for the GIF
         plot_series (bool): If True, show lineplots of data values for all dates below the map
+        use_confidence_interval (bool): If True, use confidence interval plot instead of mean/median
+        confidence_level (float): Confidence level for the interval (0-1), default is 0.95 (95%)
     """
     # Create output directory if it doesn't exist
     os.makedirs(output_dir, exist_ok=True)
@@ -518,6 +526,8 @@ def create_timelapse_gif(
                 plot_series=plot_series,
                 all_dates=sorted_dates,
                 all_data=date_data_dict,
+                use_confidence_interval=use_confidence_interval,
+                confidence_level=confidence_level,
             )
             frame_paths.append(frame_path)
 
@@ -586,6 +596,8 @@ def create_frame(
     plot_series: bool = False,
     all_dates: List[str] = None,
     all_data: Dict[str, xr.DataArray] = None,
+    use_confidence_interval: bool = False,
+    confidence_level: float = 0.95,
 ) -> str:
     """Create a single frame for the timelapse.
 
@@ -601,6 +613,8 @@ def create_frame(
         plot_series (bool): If True, show lineplots of data values for all dates below the map
         all_dates (List[str]): List of all dates in the timelapse (required if plot_series is True)
         all_data (Dict[str, xr.DataArray]): Dictionary of all data by date (required if plot_series is True)
+        use_confidence_interval (bool): If True, use confidence interval plot instead of mean/median
+        confidence_level (float): Confidence level for the interval (0-1), default is 0.95 (95%)
 
     Returns:
         str: Path to the saved frame image
@@ -708,7 +722,16 @@ def create_frame(
                 median_values.append(np.median(values))
 
         # Create line plot if we have data
-        if date_objects and mean_values and median_values:
+        if use_confidence_interval:
+            # Use the seaborn confidence interval plot
+            plot_confidence_interval(
+                ax_box,
+                all_dates,
+                all_data,
+                date,
+                confidence_level,
+            )
+        elif date_objects and mean_values and median_values:
             # Plot mean values in red
             ax_box.plot(
                 date_objects, mean_values, "r-", linewidth=2, label="Mean"
@@ -756,6 +779,93 @@ def create_frame(
     plt.close(fig)
 
     return frame_path
+
+
+def plot_confidence_interval(
+    ax, 
+    all_dates: List[str], 
+    all_data: Dict[str, xr.DataArray], 
+    current_date: str,
+    confidence_level: float = 0.95,
+) -> None:
+    """Create a seaborn lineplot with confidence intervals for each date.
+    
+    Args:
+        ax (matplotlib.axes.Axes): The axis to plot on
+        all_dates (List[str]): List of all dates in the timelapse
+        all_data (Dict[str, xr.DataArray]): Dictionary of all data by date
+        current_date (str): The current date being displayed in the main plot
+        confidence_level (float): Confidence level for the interval (0-1)
+        variable_name (str, optional): Name of the variable being plotted
+    """
+    # Prepare data for seaborn lineplot
+    data_for_plot = []
+    
+    # Process data for each date
+    for date_str in all_dates:
+        # Get non-NaN, positive values for this date
+        values = all_data[date_str].values.flatten()
+        values = values[~np.isnan(values)]
+        values = values[values > 0]
+        
+        if len(values) > 0:
+            # Create multiple entries for each date to allow for proper CI calculation
+            # Sample the data if there are too many points to keep performance reasonable
+            if len(values) > 10000:
+                # Random sampling to reduce data size while preserving distribution
+                indices = np.random.choice(len(values), size=10000, replace=False)
+                values = values[indices]
+                
+            # Create a dataframe entry for each value
+            for val in values:
+                data_for_plot.append({
+                    'date': date_str,
+                    'value': val
+                })
+    
+    # Convert to pandas DataFrame
+    if not data_for_plot:
+        print("No valid data found for confidence interval plot")
+        return
+        
+    df = pd.DataFrame(data_for_plot)
+    df['date'] = pd.to_datetime(df['date'])
+    
+    # Create the seaborn lineplot with confidence interval
+    sns.lineplot(
+        data=df,
+        x='date',
+        y='value',
+        errorbar=("ci", confidence_level*100),
+        estimator='mean',
+        color='blue',
+        ax=ax
+    )
+    
+    # Add vertical line for current date
+    current_date_obj = pd.to_datetime(current_date)
+    ax.axvline(
+        x=current_date_obj,
+        color='red',
+        linestyle='--',
+        linewidth=1.5,
+        label='Current Date'
+    )
+    
+    # Format x-axis to show dates nicely
+    ax.xaxis.set_major_formatter(
+        plt.matplotlib.dates.DateFormatter('%Y-%m-%d')
+    )
+    plt.setp(ax.get_xticklabels(), rotation=45, ha='right')
+    
+    # Add legend, title and labels
+    ax.legend(loc='best')
+    ax.set_title(f'Nightlight Values with {confidence_level*100:.0f}% Confidence Interval')
+    ax.set_ylabel(f'Radiance (nW·cm$^{{-2}}$·sr$^{{-1}}$)')
+    ax.set_xlabel('Date')
+    
+    # Add grid for better readability
+    ax.grid(True, linestyle='--', alpha=0.7)
 
 
 def create_gif(
