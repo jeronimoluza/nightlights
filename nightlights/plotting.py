@@ -22,13 +22,15 @@ from nightlights.utils import (
     MAP_BORDER_COLOR,
     MAP_STATE_COLOR,
     MAP_GRID_COLOR,
-    MAP_WATER_COLOR,
+    MAP_WATER_COLOR
+)
+
+from nightlights.process import (
+    process_files_for_date,
     prepare_data,
     create_dataarray_from_raw,
     group_files_by_date
 )
-
-from nightlights.process import process_files_for_date
 
 
 
