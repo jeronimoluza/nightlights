@@ -69,113 +69,75 @@ def load_data_from_h5(
             if region is not None:
                 # Use rio.clip to clip the data to the region
                 data_var = data_var.rio.clip([region], region_crs, drop=True)
-
-                # Extract the data array and coordinates after clipping
-                data = data_var.data
-
-                # Get the dimensions of the data array
-                if data.ndim > 2:
-                    # If there are multiple bands, get the dimensions of the first band
-                    longitude_pixels = data.shape[2]
-                    latitude_pixels = data.shape[1]
-                else:
-                    # If there's only one band, get the dimensions directly
-                    longitude_pixels = data.shape[1]
-                    latitude_pixels = data.shape[0]
-
-                # Calculate pixel size based on the actual data dimensions
-                lon_min, lon_max = data_var.x.min().item(), data_var.x.max().item()
-                lat_min, lat_max = data_var.y.min().item(), data_var.y.max().item()
-                long_pixel_length = (lon_max - lon_min) / (longitude_pixels - 1)
-                lat_pixel_length = (lat_max - lat_min) / (latitude_pixels - 1)
-
-                # Update the metadata to include the new coordinates
-                metadata = {
-                    "fill_value": fill_value,
-                    "scale_factor": data_obj.attrs.get(
-                        f"{var_path}_scale_factor", 1.0
-                    ),
-                    "offset": data_obj.attrs.get(f"{var_path}_offset", 0.0),
-                    "product": data_obj.attrs.get("ShortName", ""),
-                    "date": data_obj.attrs.get("RangeBeginningdate", ""),
-                    "lons": data_var.x.values,  # Use clipped coordinates
-                    "lats": data_var.y.values,  # Use clipped coordinates
-                    "filename": filename,
-                    "tile": tile,
-                    "julian_date": julian_date,
-                    "calendar_date": calendar_date,
-                    "horizontal_tile_number": h_num,
-                    "vertical_tile_number": v_num,
-                    "west_bound": west_bound,
-                    "north_bound": north_bound,
-                    "east_bound": east_bound,
-                    "south_bound": south_bound,
-                    "longitude_pixels": longitude_pixels,
-                    "latitude_pixels": latitude_pixels,
-                    "long_pixel_length": long_pixel_length,
-                    "lat_pixel_length": lat_pixel_length
-                }
-
-                # If we have a fill value, make sure it's properly applied
-                if fill_value is not None:
-                    # Create a mask for values that should be NaN
-                    mask = np.isclose(data, fill_value) | np.isnan(data)
-                    data = np.where(mask, np.nan, data)
-
-                # Return early with the clipped data and updated metadata
-                return data, metadata, data_var
+                # Use clipped coordinates for calculations
+                x_values = data_var.x.values
+                y_values = data_var.y.values
             else:
-                data = data_var.data
+                # Use original coordinates
+                x_values = data_obj.x.values
+                y_values = data_obj.y.values
 
-                # Get the dimensions of the data array
-                if data.ndim > 2:
-                    # If there are multiple bands, get the dimensions of the first band
-                    longitude_pixels = data.shape[2]
-                    latitude_pixels = data.shape[1]
-                else:
-                    # If there's only one band, get the dimensions directly
-                    longitude_pixels = data.shape[1]
-                    latitude_pixels = data.shape[0]
+            # Extract the data array
+            data = data_var.data
 
-                # Calculate pixel size based on the actual data dimensions
-                lon_min, lon_max = data_obj.x.min().item(), data_obj.x.max().item()
-                lat_min, lat_max = data_obj.y.min().item(), data_obj.y.max().item()
-                long_pixel_length = (lon_max - lon_min) / (longitude_pixels - 1)
-                lat_pixel_length = (lat_max - lat_min) / (latitude_pixels - 1)
+            # Get the dimensions of the data array
+            if data.ndim > 2:
+                # If there are multiple bands, get the dimensions of the first band
+                longitude_pixels = data.shape[2]
+                latitude_pixels = data.shape[1]
+            else:
+                # If there's only one band, get the dimensions directly
+                longitude_pixels = data.shape[1]
+                latitude_pixels = data.shape[0]
 
-                # Extract metadata
-                metadata = {
-                    "fill_value": data_obj.attrs.get(f"{var_path}__FillValue"),
-                    "scale_factor": data_obj.attrs.get(
-                        f"{var_path}_scale_factor", 1.0
-                    ),
-                    "offset": data_obj.attrs.get(f"{var_path}_offset", 0.0),
-                    "product": data_obj.attrs.get("ShortName", ""),
-                    "date": data_obj.attrs.get("RangeBeginningdate", ""),
-                    "lons": data_obj.x.values,
-                    "lats": data_obj.y.values,
-                    "filename": filename,
-                    "tile": tile,
-                    "julian_date": julian_date,
-                    "calendar_date": calendar_date,
-                    "horizontal_tile_number": h_num,
-                    "vertical_tile_number": v_num,
-                    "west_bound": west_bound,
-                    "north_bound": north_bound,
-                    "east_bound": east_bound,
-                    "south_bound": south_bound,
-                    "longitude_pixels": longitude_pixels,
-                    "latitude_pixels": latitude_pixels,
-                    "long_pixel_length": long_pixel_length,
-                    "lat_pixel_length": lat_pixel_length
-                }
+            # Calculate pixel size based on the actual data dimensions
+            lon_min, lon_max = np.min(x_values).item(), np.max(x_values).item()
+            lat_min, lat_max = np.min(y_values).item(), np.max(y_values).item()
+            long_pixel_length = (lon_max - lon_min) / (longitude_pixels - 1)
+            lat_pixel_length = (lat_max - lat_min) / (latitude_pixels - 1)
 
-                return data, metadata, data_obj
+            # Create common metadata dictionary
+            metadata = {
+                "fill_value": fill_value,
+                "scale_factor": data_obj.attrs.get(f"{var_path}_scale_factor", 1.0),
+                "offset": data_obj.attrs.get(f"{var_path}_offset", 0.0),
+                "product": data_obj.attrs.get("ShortName", ""),
+                "date": data_obj.attrs.get("RangeBeginningdate", ""),
+                "lons": x_values,
+                "lats": y_values,
+                "filename": filename,
+                "tile": tile,
+                "julian_date": julian_date,
+                "calendar_date": calendar_date,
+                "horizontal_tile_number": h_num,
+                "vertical_tile_number": v_num,
+                "west_bound": west_bound,
+                "north_bound": north_bound,
+                "east_bound": east_bound,
+                "south_bound": south_bound,
+                "longitude_pixels": longitude_pixels,
+                "latitude_pixels": latitude_pixels,
+                "long_pixel_length": long_pixel_length,
+                "lat_pixel_length": lat_pixel_length
+            }
+
+            # If we have a fill value, make sure it's properly applied
+            if fill_value is not None:
+                # Create a mask for values that should be NaN
+                mask = np.isclose(data, fill_value) | np.isnan(data)
+                data = np.where(mask, np.nan, data)
+
+            # Return the data, metadata, and data object/variable
+            return_obj = data_var if region is not None else data_obj
+            return data, metadata, return_obj
         except KeyError:
             raise ValueError(
                 f"Variable {variable_name} not found in file {path}\n"
                 f"Available variables: {list(data_obj.var())}"
             )
+        except rxr.exceptions.NoDataInBounds as e:
+            print(f"No data in bounds for file {path}: {e}")
+            return None, None, None
 
 
 def prepare_data(
@@ -354,6 +316,9 @@ def polygonize_file(
     """
     # Use load_data_from_h5 to get the data and metadata
     _, metadata, _ = load_data_from_h5(path, variable_name, region, region_crs)
+
+    if metadata is None:
+        return gpd.GeoDataFrame({"geometry": []}, crs=region_crs)
 
     # Extract metadata information
     Tile = metadata["tile"]

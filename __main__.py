@@ -11,13 +11,13 @@ if __name__ == "__main__":
     final_output_dir = "./data/output"
 
     # Define search parameters
-    short_name = "VNP46A3"
+    short_name = "VNP46A4"
     version = "1"
-    start_date = "2023-03-01"
-    end_date = "2023-12-15"
+    start_date = "2012-01-01"
+    end_date = "2024-12-15"
 
     region = download.find_region(
-        query="Lebanon",
+        query="Provincia de Buenos Aires",
     )
     region_crs = region.crs.to_epsg()
     region = region.geometry.values[0]
@@ -46,19 +46,21 @@ if __name__ == "__main__":
     #     region=region,
     # )
 
-    # gdf = process.polygonize(
-    #     files, variable_name=variable_name, region=region, region_crs=region_crs
-    # )
+    gdf = process.polygonize(
+        files, variable_name=variable_name, region=region, region_crs=region_crs
+    )
+    gdf['datetimestr'] = gdf.date.dt.strftime('%Y-%m-%d 00:00:00')
+    gdf.to_csv('test.csv')
     plotting.create_timelapse_gif(
         files,
         variable_name=variable_name,
-        title="Lebanon",
+        title="Ethiopia Through the Years",
         output_dir=plot_dir,
         region=region,
         fps=2.0,
         plot_series=True,
         use_confidence_interval=True,
         confidence_level=0.95,
-        cut_off=0.5,
+        #cut_off=0.5,
     )
 

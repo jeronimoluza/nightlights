@@ -176,3 +176,7 @@ cython_debug/
 
 # Data
 data/**
+test.csv
+
+# OSM cache
+cache/**
