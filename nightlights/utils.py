@@ -12,7 +12,6 @@ import datetime
 import pandas as pd
 
 # Constants
-PREFIX = "HDFEOS_GRIDS_VIIRS_Grid_DNB_2d_Data_Fields_"
 DEFAULT_CMAP = "cividis"
 DEFAULT_BUFFER = 0.2  # degrees
 

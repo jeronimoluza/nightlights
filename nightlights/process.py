@@ -31,6 +31,33 @@ def load_data_from_h5(
         tuple: (data, metadata, data_obj) arrays and metadata for processing
     """
     with rxr.open_rasterio(path) as data_obj:
+        # Extract filename information for metadata
+        filename = path.split("/")[-1].replace(".h5", "")
+        tile = [x for x in filename.split(".") if ("h" in x) and ("v" in x)][0]
+        julian_date = filename.split(".")[1].replace("A", "")
+        
+        try:
+            calendar_date = (
+                datetime.datetime.strptime(julian_date, "%Y%j")
+                .date()
+                .strftime("%Y-%m-%d")
+            )
+        except ValueError:
+            calendar_date = ""
+        
+        # Extract horizontal and vertical tile numbers from the filename
+        try:
+            h_num = int(tile.split("h")[1].split("v")[0])
+            v_num = int(tile.split("v")[1])
+        except (IndexError, ValueError):
+            h_num = 0
+            v_num = 0
+            
+        # Calculate bounds based on tile numbers
+        west_bound = (10 * h_num) - 180
+        north_bound = 90 - (10 * v_num)
+        east_bound = west_bound + 10
+        south_bound = north_bound - 10
 
         var_path = f"{PREFIX}{variable_name}"
         try:
@@ -57,6 +84,16 @@ def load_data_from_h5(
                     "date": data_obj.attrs.get("RangeBeginningdate", ""),
                     "lons": data_var.x.values,  # Use clipped coordinates
                     "lats": data_var.y.values,  # Use clipped coordinates
+                    "filename": filename,
+                    "tile": tile,
+                    "julian_date": julian_date,
+                    "calendar_date": calendar_date,
+                    "horizontal_tile_number": h_num,
+                    "vertical_tile_number": v_num,
+                    "west_bound": west_bound,
+                    "north_bound": north_bound,
+                    "east_bound": east_bound,
+                    "south_bound": south_bound
                 }
 
                 # If we have a fill value, make sure it's properly applied
@@ -86,6 +123,16 @@ def load_data_from_h5(
             "date": data_obj.attrs.get("RangeBeginningdate", ""),
             "lons": data_obj.x.values,
             "lats": data_obj.y.values,
+            "filename": filename,
+            "tile": tile,
+            "julian_date": julian_date,
+            "calendar_date": calendar_date,
+            "horizontal_tile_number": h_num,
+            "vertical_tile_number": v_num,
+            "west_bound": west_bound,
+            "north_bound": north_bound,
+            "east_bound": east_bound,
+            "south_bound": south_bound
         }
 
         return data, metadata, data_obj
@@ -213,153 +260,7 @@ def group_files_by_date(files: List[str]) -> Dict[str, List[str]]:
     return files_by_date
 
 
-def process_file(
-    path: str, variable_name: str, region: Polygon | MultiPolygon = None, region_crs: int = 4326
-) -> pd.DataFrame:
-    """
-    This function processes a raster file containing Black Marble data and returns a DataFrame with the extracted information.
-
-    Args:
-        path (str): The path to the raster file to be processed.
-        bounding_box (tuple, optional): A tuple containing the bounding box coordinates in the format
-            (lower_left_lon, lower_left_lat, upper_right_lon, upper_right_lat). If provided, only data within
-            this bounding box will be returned. Defaults to None.
-
-    Returns:
-        pd.DataFrame: A DataFrame containing the extracted information from the raster file.
-    """
-    with rxr.open_rasterio(path) as data_obj:
-        filename = path.split("/")[-1].replace(".h5", "")
-        Tile = [x for x in filename.split(".") if ("h" in x) and ("v" in x)][0]
-        Julian_date = filename.split(".")[1].replace("A", "")
-        Calendar_date = (
-            datetime.datetime.strptime(Julian_date, "%Y%j")
-            .date()
-            .strftime("%Y-%m-%d")
-        )
-
-        HorizontalTileNumber = data_obj.HorizontalTileNumber
-        VerticalTileNumber = data_obj.VerticalTileNumber
-
-        WestBoundCoord = (10 * HorizontalTileNumber) - 180
-        NorthBoundCoord = 90 - (10 * VerticalTileNumber)
-        EastBoundCoord = WestBoundCoord + 10
-        SouthBoundCoord = NorthBoundCoord - 10
-
-        longitude_pixels = data_obj.sizes["x"]
-        latitude_pixels = data_obj.sizes["y"]
-
-        long_pixel_length = (
-            EastBoundCoord - WestBoundCoord
-        ) / longitude_pixels
-        lat_pixel_length = (
-            NorthBoundCoord - SouthBoundCoord
-        ) / latitude_pixels
-
-        def clean_column_name(colname):
-            return colname.replace(PREFIX, "")
-
-        variables = list(data_obj.var().variables)
-        clean_names = [clean_column_name(col) for col in variables]
-
-        cleaner = dict(zip(variables, clean_names))
-
-        fill_value = data_obj.attrs[f"{PREFIX}{variable_name}__FillValue"]
-        scale_factor = data_obj.attrs[f"{PREFIX}{variable_name}_scale_factor"]
-        offset_value = data_obj.attrs[f"{PREFIX}{variable_name}_offset"]
-        data_obj = data_obj[f"{PREFIX}{variable_name}"].squeeze()
-
-        if region is not None:
-            data_obj = data_obj.rio.clip([region], region_crs, drop=True)
-
-        data = (
-            data_obj.to_dataframe()
-            .rename(columns=cleaner)
-            .reset_index()
-        )
-
-        data["latitude"] = data["y"]
-        data["longitude"] = data["x"]
-
-        # Create date variable (Julian and calendar format)
-        data = data.assign(Julian_date=Julian_date)
-        data = data.assign(date=Calendar_date)
-        data = data.assign(tile=Tile)
-
-        data["latcorner0"] = pd.to_numeric(
-            data["latitude"] - (lat_pixel_length / 2)
-        )
-        data["loncorner0"] = pd.to_numeric(
-            data["longitude"] - (long_pixel_length / 2)
-        )
-
-        data["latcorner1"] = pd.to_numeric(
-            data["latitude"] - (lat_pixel_length / 2)
-        )
-        data["loncorner1"] = pd.to_numeric(
-            data["longitude"] + (long_pixel_length / 2)
-        )
-
-        data["latcorner2"] = pd.to_numeric(
-            data["latitude"] + (lat_pixel_length / 2)
-        )
-        data["loncorner2"] = pd.to_numeric(
-            data["longitude"] + (long_pixel_length / 2)
-        )
-
-        data["latcorner3"] = pd.to_numeric(
-            data["latitude"] + (lat_pixel_length / 2)
-        )
-        data["loncorner3"] = pd.to_numeric(
-            data["longitude"] - (long_pixel_length / 2)
-        )
-
-        """ pyarrow won't write uint dtypes"""
-        ints = data.select_dtypes(exclude=[float, object]).columns.tolist()
-        data[ints] = data[ints].astype(np.float32)
-
-        data = data.drop(
-            [
-                "x",
-                "y",
-                "band",
-                "spatial_ref",
-            ],
-            axis=1,
-        )
-        data["filename"] = filename
-
-        data = data.drop(
-            [
-                "latitude",
-                "longitude",
-            ],
-            axis=1,
-        )
-
-        data["variable_name"] = variable_name
-        data = data.rename(columns={variable_name: "value"})
-        data["value"] = data["value"].replace(fill_value, np.nan)
-        data["value"] = data["value"] * scale_factor + offset_value
-
-        data = data[
-            [
-                "filename",
-                "date",
-                "loncorner0",
-                "latcorner0",
-                "loncorner1",
-                "latcorner1",
-                "loncorner2",
-                "latcorner2",
-                "loncorner3",
-                "latcorner3",
-                "value",
-                "variable_name",
-            ]
-        ]
-
-        return data
+# The process_file function has been replaced by polygonize_file
 
 
 def corners_to_geometry(df):
@@ -392,19 +293,176 @@ def corners_to_geometry(df):
     return df
 
 
-def process_files(
-    list_of_files: list, variable_name: str, region: Polygon | MultiPolygon = None, region_crs: int = 4326
-) -> gpd.GeoDataFrame:
-    output = []
-    for file in list_of_files:
-        df = process_file(
-            file, variable_name=variable_name, region=region, region_crs=region_crs
-        )
-        output.append(df)
 
-    output = pd.concat(output).reset_index(drop=True)
-    gdf = corners_to_geometry(output)
-    return gdf
+def polygonize_file(
+    path: str, variable_name: str, region: Polygon | MultiPolygon = None, region_crs: int = 4326
+) -> gpd.GeoDataFrame:
+    """
+    Process a raster file containing Black Marble data and return a GeoDataFrame with polygonized pixels.
+    Uses the existing utility functions to avoid code duplication.
+
+    Args:
+        path (str): Path to the raster file
+        variable_name (str): Name of the variable to extract
+        region (Polygon | MultiPolygon, optional): Region to clip the data to. Defaults to None.
+        region_crs (int, optional): CRS of the region. Defaults to 4326.
+
+    Returns:
+        gpd.GeoDataFrame: A GeoDataFrame containing the polygonized pixels from the raster file.
+    """
+    # Use load_data_from_h5 to get the data and metadata
+    _, metadata, _ = load_data_from_h5(path, variable_name, region, region_crs)
+    
+    # Extract metadata information
+    Tile = metadata["tile"]
+    Calendar_date = metadata["calendar_date"]
+    
+    # Get bounds from metadata
+    WestBoundCoord = metadata["west_bound"]
+    NorthBoundCoord = metadata["north_bound"]
+    EastBoundCoord = metadata["east_bound"]
+    SouthBoundCoord = metadata["south_bound"]
+    
+    # Get dimensions
+    longitude_pixels = len(metadata["lons"])
+    latitude_pixels = len(metadata["lats"])
+    
+    # Calculate pixel size
+    long_pixel_length = (EastBoundCoord - WestBoundCoord) / longitude_pixels
+    lat_pixel_length = (NorthBoundCoord - SouthBoundCoord) / latitude_pixels
+    
+    # Prepare the data (apply scaling, offset, etc.)
+    data, lons, lats = prepare_data(path, variable_name, log_scale=False, region=region, region_crs=region_crs)
+    
+    # Create a list to store the pixel information
+    pixels = []
+    
+    # Iterate through each pixel in the data array
+    for i in range(data.shape[0]):
+        for j in range(data.shape[1]):
+            # Get the pixel value
+            value = data[i, j]
+            
+            # Skip NaN values
+            if np.isnan(value):
+                continue
+            
+            # Get coordinates
+            lon = lons[j]
+            lat = lats[i]
+            
+            # Calculate corners
+            loncorner0 = lon - long_pixel_length / 2
+            latcorner0 = lat - lat_pixel_length / 2
+            loncorner1 = lon + long_pixel_length / 2
+            latcorner1 = lat - lat_pixel_length / 2
+            loncorner2 = lon + long_pixel_length / 2
+            latcorner2 = lat + lat_pixel_length / 2
+            loncorner3 = lon - long_pixel_length / 2
+            latcorner3 = lat + lat_pixel_length / 2
+            
+            # Create polygon from corners
+            corners = [
+                (loncorner0, latcorner0),
+                (loncorner1, latcorner1),
+                (loncorner2, latcorner2),
+                (loncorner3, latcorner3),
+                (loncorner0, latcorner0),
+            ]
+            polygon = Polygon(corners)
+            
+            # Add the pixel information to the list
+            pixels.append({
+                "tile": Tile,
+                "date": Calendar_date,
+                "variable": variable_name,
+                "value": value,
+                "geometry": polygon.wkt
+            })
+    
+    # Create a GeoDataFrame from the pixel information
+    if pixels:
+        df = pd.DataFrame(pixels)
+        gdf = gpd.GeoDataFrame(df, geometry=gpd.GeoSeries.from_wkt(df["geometry"]), crs=region_crs)
+        return gdf
+    else:
+        # Return an empty GeoDataFrame if no pixels were processed
+        return gpd.GeoDataFrame(geometry=[], crs=region_crs)
+
+
+def polygonize(
+    list_of_files: list, 
+    variable_name: str, 
+    region: Polygon | MultiPolygon = None, 
+    region_crs: int = 4326,
+    batch_process: bool = False,
+    extraction_dir: str = None,
+    output_dir: str = None
+) -> Union[gpd.GeoDataFrame, None]:
+    """
+    Polygonize multiple raster files containing Black Marble data.
+
+    Args:
+        list_of_files (list): List of paths to raster files
+        variable_name (str): Name of the variable to extract
+        region (Polygon | MultiPolygon, optional): Region to clip the data to. Defaults to None.
+        region_crs (int, optional): CRS of the region. Defaults to 4326.
+        batch_process (bool, optional): Whether to process files in batch mode, saving intermediate results. Defaults to False.
+        extraction_dir (str, optional): Directory to save intermediate results. Required if batch_process is True.
+        output_dir (str, optional): Directory to save final output. Required if batch_process is True.
+
+    Returns:
+        Union[gpd.GeoDataFrame, None]: A GeoDataFrame containing the polygonized pixels from all files, or None if batch_process is True.
+    """
+    if batch_process:
+        if extraction_dir is None or output_dir is None:
+            raise ValueError("extraction_dir and output_dir must be provided when batch_process is True")
+        
+        os.makedirs(extraction_dir, exist_ok=True)
+        os.makedirs(output_dir, exist_ok=True)
+
+        print(f"Batch processing {len(list_of_files)} files.")
+        for file in tqdm(list_of_files, desc="Processing files"):
+            filename = file.split("/")[-1]
+            output_file = filename.replace(".h5", ".csv")
+            gdf = polygonize_file(
+                file, variable_name=variable_name, region=region, region_crs=region_crs
+            )
+            gdf.to_csv(f"{extraction_dir}/{output_file}", index=None)
+
+        files = os.listdir(extraction_dir)
+        output = []
+
+        for file in tqdm(files, desc="Combining results"):
+            if file.endswith(".csv"):
+                df = pd.read_csv(f"{extraction_dir}/{file}")
+                output.append(df)
+
+        if output:
+            combined_output = pd.concat(output)
+            combined_output.to_csv(f"{output_dir}/output.csv", index=None)
+            print("Batch processing completed")
+            print(f"Extracted files are at {extraction_dir}")
+            print(f"Output file is at {output_dir}/output.csv")
+        else:
+            print("No files were processed")
+        
+        return None
+    else:
+        # Process all files and return a combined GeoDataFrame
+        output = []
+        for file in tqdm(list_of_files, desc="Processing files"):
+            gdf = polygonize_file(
+                file, variable_name=variable_name, region=region, region_crs=region_crs
+            )
+            output.append(gdf)
+
+        if output:
+            data = pd.concat(output).reset_index(drop=True)
+            data = gpd.GeoDataFrame(data, geometry="geometry")
+            return data
+        else:
+            return gpd.GeoDataFrame()
 
 
 def process_files_for_date(
@@ -450,37 +508,4 @@ def process_files_for_date(
 
     return combined_data
 
-
-def batch_process_files(
-    list_of_files: list,
-    variable_name: str,
-    extraction_dir: str,
-    output_dir: str,
-    region: Polygon | MultiPolygon = None, region_crs: int = 4326
-) -> None:
-    os.makedirs(extraction_dir, exist_ok=True)
-    os.makedirs(output_dir, exist_ok=True)
-
-    print(f"Batch processing {len(list_of_files)} files.")
-    for file in list_of_files:
-        filename = file.split("/")[-1]
-        output_file = filename.replace(".h5", ".csv")
-        df = process_file(
-            file, variable_name=variable_name, region=region, region_crs=region_crs
-        )
-        df = corners_to_geometry(df)
-        df.to_csv(f"{extraction_dir}/{output_file}", index=None)
-
-    files = os.listdir(extraction_dir)
-    output = []
-
-    for file in files:
-        df = pd.read_csv(f"{extraction_dir}/{file}")
-        output.append(df)
-
-    output = pd.concat(output)
-    output.to_csv(f"{output_dir}/output.csv", index=None)
-    print("Batch processing completed")
-    print(f"Extracted files are at {extraction_dir}")
-    print(f"Output file is at {output_dir}")
 
