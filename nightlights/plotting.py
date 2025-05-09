@@ -14,16 +14,17 @@ from typing import Dict, List, Tuple, Union, Optional
 import seaborn as sns
 import pandas as pd
 
-from nightlights.utils import (
-    DEFAULT_CMAP,
-    DEFAULT_BUFFER,
-    MAP_BACKGROUND_COLOR,
-    MAP_COASTLINE_COLOR,
-    MAP_BORDER_COLOR,
-    MAP_STATE_COLOR,
-    MAP_GRID_COLOR,
-    MAP_WATER_COLOR
-)
+# Constants
+DEFAULT_CMAP = "cividis"
+DEFAULT_BUFFER = 0.2  # degrees
+
+# Map styling parameters
+MAP_BACKGROUND_COLOR = "white"  # Background color for cartopy maps
+MAP_COASTLINE_COLOR = "black"  # Color for coastlines
+MAP_BORDER_COLOR = "gray"  # Color for country borders
+MAP_STATE_COLOR = "gray"  # Color for state/province borders
+MAP_GRID_COLOR = "gray"  # Color for gridlines
+MAP_WATER_COLOR = "lightblue"  # Color for water bodies (ocean, lakes, rivers)
 
 from nightlights.process import (
     process_files_for_date,
@@ -246,6 +247,7 @@ def create_timelapse_gif(
     plot_series: bool = False,
     use_confidence_interval: bool = False,
     confidence_level: float = 0.95,
+    sample_size: int = None,
     cut_off: float = 0,
 ) -> None:
     """Create a timelapse GIF from multiple dates of data, using only region-filtered data.
@@ -261,6 +263,7 @@ def create_timelapse_gif(
         plot_series (bool): If True, show lineplots of data values for all dates below the map
         use_confidence_interval (bool): If True, use confidence interval plot instead of mean/median
         confidence_level (float): Confidence level for the interval (0-1), default is 0.95 (95%)
+        sample_size (int): Number of values to sample for each date
         cut_off (float): Minimum value to include in the series plot
     """
     # Create output directory if it doesn't exist
@@ -347,6 +350,7 @@ def create_timelapse_gif(
                 all_data=date_data_dict,
                 use_confidence_interval=use_confidence_interval,
                 confidence_level=confidence_level,
+                sample_size=sample_size,
                 cut_off=cut_off,
             )
             frame_paths.append(frame_path)
@@ -378,6 +382,7 @@ def create_frame(
     all_data: Dict[str, xr.DataArray] = None,
     use_confidence_interval: bool = False,
     confidence_level: float = 0.95,
+    sample_size: int = None,
     cut_off: float = 0,
 ) -> str:
     """Create a single frame for the timelapse.
@@ -396,6 +401,7 @@ def create_frame(
         all_data (Dict[str, xr.DataArray]): Dictionary of all data by date (required if plot_series is True)
         use_confidence_interval (bool): If True, use confidence interval plot instead of mean/median
         confidence_level (float): Confidence level for the interval (0-1), default is 0.95 (95%)
+        sample_size (int): Number of values to sample for each date
         cut_off (float): Minimum value to include in the series plot
 
     Returns:
@@ -491,7 +497,7 @@ def create_frame(
             # Get non-NaN values for this date
             values = all_data[d].values.flatten()
             values = values[~np.isnan(values)]
-            values = values[values > 0]
+            values = values[values > cut_off]
             if len(values) > 0:
                 # Apply log transformation to match the map data
                 # Add 1 to avoid log(0) just like in prepare_data function
@@ -514,6 +520,7 @@ def create_frame(
                 all_data,
                 date,
                 confidence_level,
+                sample_size=sample_size,
                 cut_off=cut_off,
             )
         elif date_objects and mean_values and median_values:
@@ -595,28 +602,40 @@ def plot_confidence_interval(
     
     # Process data for each date
     for date_str in all_dates:
-        # Get non-NaN, positive values for this date
-        values = all_data[date_str].values.flatten()
-        values = values[~np.isnan(values)]
-        values = values[values > cut_off]
-        
-        if len(values) > 0:
-            # Store all values for y-axis limit calculation
-            all_values.extend(values)
+        if date_str not in all_data or all_data[date_str] is None:
+            print(f"Missing or invalid data for date: {date_str}")
+            continue
             
-            # Create multiple entries for each date to allow for proper CI calculation
-            # Sample the data if there are too many points to keep performance reasonable
-            if sample_size is not None and len(values) > sample_size:
-            #     # Random sampling to reduce data size while preserving distribution
-                indices = np.random.choice(len(values), size=sample_size, replace=False)
-                values = values[indices]
+        # Get non-NaN values for this date
+        try:
+            values = all_data[date_str].values.flatten()
+            values = values[~np.isnan(values)]
+            
+            # Apply cut-off filter (use greater than or equal to)
+            # values = values[values >= cut_off]
+            
+            if len(values) > 0:
+                # Store all values for y-axis limit calculation
+                all_values.extend(values)
                 
-            # Create a dataframe entry for each value
-            for val in values:
-                data_for_plot.append({
-                    'date': date_str,
-                    'value': val
-                })
+                # Create multiple entries for each date to allow for proper CI calculation
+                # Sample the data if there are too many points to keep performance reasonable
+                if sample_size is not None and len(values) > sample_size:
+                    # Random sampling to reduce data size while preserving distribution
+                    indices = np.random.choice(len(values), size=sample_size, replace=False)
+                    values = values[indices]
+                    
+                # Create a dataframe entry for each value
+                for val in values:
+                    data_for_plot.append({
+                        'date': date_str,
+                        'value': val
+                    })
+            else:
+                print(f"No valid values above cut-off for date: {date_str}")
+        except Exception as e:
+            print(f"Error processing data for date {date_str}: {e}")
+            continue
     
     # Convert to pandas DataFrame
     if not data_for_plot:
@@ -650,8 +669,8 @@ def plot_confidence_interval(
     # Calculate and set fixed y-axis limits if requested
     if fixed_y_limits and all_values:
         # Calculate percentiles to exclude extreme outliers
-        y_min = np.percentile(all_values, 1)  # 1st percentile
-        y_max = np.percentile(all_values, 95)  # 95th percentile
+        y_min = np.mean(all_values) - np.std(all_values)
+        y_max = np.mean(all_values) + np.std(all_values)
         
         # Add some padding
         y_range = y_max - y_min

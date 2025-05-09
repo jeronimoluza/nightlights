@@ -11,17 +11,6 @@ from shapely import wkt
 import datetime
 import pandas as pd
 
-# Constants
-DEFAULT_CMAP = "cividis"
-DEFAULT_BUFFER = 0.2  # degrees
-
-# Map styling parameters
-MAP_BACKGROUND_COLOR = "white"  # Background color for cartopy maps
-MAP_COASTLINE_COLOR = "black"  # Color for coastlines
-MAP_BORDER_COLOR = "gray"  # Color for country borders
-MAP_STATE_COLOR = "gray"  # Color for state/province borders
-MAP_GRID_COLOR = "gray"  # Color for gridlines
-MAP_WATER_COLOR = "lightblue"  # Color for water bodies (ocean, lakes, rivers)
 
 
 def get_bounding_box(region):

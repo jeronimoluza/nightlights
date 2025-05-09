@@ -135,9 +135,9 @@ def load_data_from_h5(
                 f"Variable {variable_name} not found in file {path}\n"
                 f"Available variables: {list(data_obj.var())}"
             )
-        except rxr.exceptions.NoDataInBounds as e:
-            print(f"No data in bounds for file {path}: {e}")
-            return None, None, None
+        # except rxr.exceptions.NoDataInBounds as e:
+        #     print(f"No data in bounds for file {path}: {e}")
+            # return None, None, None
 
 
 def prepare_data(
@@ -171,11 +171,11 @@ def prepare_data(
             np.nan,
             data,
         )
-    data = data * metadata["scale_factor"] + metadata["offset"]
-
+    data = (data * metadata["scale_factor"]) + metadata["offset"]
     # Apply log scaling if requested
     if log_scale:
         data = np.log(data + 1)  # Add 1 to avoid log(0)
+        
 
     # Get the first band (assuming single band data)
     if data.ndim > 2:
@@ -315,7 +315,7 @@ def polygonize_file(
         gpd.GeoDataFrame: A GeoDataFrame containing the polygonized pixels from the raster file.
     """
     # Use load_data_from_h5 to get the data and metadata
-    _, metadata, _ = load_data_from_h5(path, variable_name, region, region_crs)
+    data, metadata, obj = load_data_from_h5(path, variable_name, region, region_crs)
 
     if metadata is None:
         return gpd.GeoDataFrame({"geometry": []}, crs=region_crs)
@@ -488,10 +488,6 @@ def polygonize_optimized(
             if metadata is None:
                 continue
             
-            # Get coordinate arrays
-            lons = metadata["lons"]
-            lats = metadata["lats"]
-            
             # Handle extra dimensions in the data array
             if data.ndim > 2:
                 if data.shape[0] == 1:
@@ -499,6 +495,13 @@ def polygonize_optimized(
                 else:
                     data = data[0]
             
+            data, lons, lats = prepare_data(
+                file,
+                variable_name,
+                log_scale=False,
+                region=region,
+                region_crs=region_crs,
+            )
             # Store pixel dimensions for this file
             pixel_dimensions[file] = {
                 "long_pixel_length": metadata["long_pixel_length"],
@@ -511,10 +514,7 @@ def polygonize_optimized(
                     value = data[i, j]
                     
                     # Skip NaN values
-                    if isinstance(value, np.ndarray):
-                        if np.isnan(value).any() or value.size == 0:
-                            continue
-                    elif np.isnan(value):
+                    if np.isnan(value):
                         continue
                     
                     # Get coordinates
@@ -558,13 +558,18 @@ def polygonize_optimized(
             if metadata is None:
                 continue
                 
+            # Prepare the data (apply scaling, offset, etc.)
+            data, lons, lats = prepare_data(
+                file,
+                variable_name,
+                log_scale=False,
+                region=region,
+                region_crs=region_crs,
+            )
+            
             # Extract metadata information
             tile = metadata["tile"]
             calendar_date = metadata["calendar_date"]
-            
-            # Get coordinate arrays
-            lons = metadata["lons"]
-            lats = metadata["lats"]
             
             # Handle extra dimensions in the data array
             if data.ndim > 2:

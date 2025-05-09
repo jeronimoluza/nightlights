@@ -17,11 +17,15 @@ def do_main():
     start_date = "2012-01-01"
     end_date = "2024-12-15"
 
-    region = download.find_region(
-        query="Provincia de Buenos Aires",
+    regions = ["Ciudad Autónoma de Buenos Aires"]
+    region_gdf = gpd.GeoDataFrame(
+        pd.concat(
+            [download.find_region(query=region) for region in regions], ignore_index=True
+        ), geometry="geometry"
     )
-    region_crs = region.crs.to_epsg()
-    region = region.geometry.values[0]
+
+    region_crs = region_gdf.crs.to_epsg()
+    region = region_gdf.union_all()
 
     files = download.download_earthaccess(
         download_dir=download_dir,
@@ -48,20 +52,24 @@ def do_main():
     # )
 
     # Use the optimized polygonization approach (default behavior)
-    # gdf = process.polygonize(
-    #     files, variable_name=variable_name, region=region, region_crs=region_crs, optimize_geometry=True
-    # )
+    gdf = process.polygonize(
+        files, variable_name=variable_name, region=region, region_crs=region_crs, optimize_geometry=True
+    )
+    print(gdf.head())
+    gdf[gdf.date=='2012-01-01'].to_csv('data/polygonized.csv')
     plotting.create_timelapse_gif(
         files,
         variable_name=variable_name,
         title="Buenos Aires Through the Years",
         output_dir=plot_dir,
         region=region,
+        region_crs=region_crs,
         fps=2.0,
         plot_series=True,
         use_confidence_interval=True,
         confidence_level=0.95,
-        #cut_off=0.5,
+        sample_size=10000,
+        # cut_off=0.5,
     )
 
 if __name__ == "__main__":
