@@ -11,10 +11,10 @@ if __name__ == "__main__":
     final_output_dir = "./data/output"
 
     # Define search parameters
-    short_name = "VNP46A4"
+    short_name = "VNP46A3"
     version = "1"
     start_date = "2022-01-01"
-    end_date = "2023-01-31"
+    end_date = "2022-12-31"
 
     # region = wkt.loads(
     #     # "POLYGON((33.0 14.89, 47.98 14.89, 47.98 3.4, 33.0 3.4, 33.0 14.89))"
@@ -26,7 +26,7 @@ if __name__ == "__main__":
         "https://raw.githubusercontent.com/datasets/geo-boundaries-world-110m/refs/heads/main/countries.geojson"
     )
     region_crs = gdf.crs.to_epsg()
-    region = gdf[gdf.region_wb == "Latin America & Caribbean"].geometry.unary_union
+    region = gdf[gdf.name == "Argentina"].geometry.values[0]
 
     files = download.download_earthaccess(
         download_dir=download_dir,
@@ -55,10 +55,9 @@ if __name__ == "__main__":
     plotting.create_timelapse_gif(
         files,
         variable_name=variable_name,
-        title="Latin America & Caribbean",
+        title="Argentina",
         output_dir=plot_dir,
         region=region,
-        region_crs=region_crs,
         fps=2.0,
         plot_series=True,
     )
