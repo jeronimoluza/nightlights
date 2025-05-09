@@ -260,6 +260,7 @@ def create_timelapse_gif(
         plot_series (bool): If True, show lineplots of data values for all dates below the map
         use_confidence_interval (bool): If True, use confidence interval plot instead of mean/median
         confidence_level (float): Confidence level for the interval (0-1), default is 0.95 (95%)
+        cut_off (float): Minimum value to include in the series plot
     """
     # Create output directory if it doesn't exist
     os.makedirs(output_dir, exist_ok=True)
@@ -345,6 +346,7 @@ def create_timelapse_gif(
                 all_data=date_data_dict,
                 use_confidence_interval=use_confidence_interval,
                 confidence_level=confidence_level,
+                cut_off=cut_off,
             )
             frame_paths.append(frame_path)
 
@@ -375,6 +377,7 @@ def create_frame(
     all_data: Dict[str, xr.DataArray] = None,
     use_confidence_interval: bool = False,
     confidence_level: float = 0.95,
+    cut_off: float = 0,
 ) -> str:
     """Create a single frame for the timelapse.
 
@@ -392,6 +395,7 @@ def create_frame(
         all_data (Dict[str, xr.DataArray]): Dictionary of all data by date (required if plot_series is True)
         use_confidence_interval (bool): If True, use confidence interval plot instead of mean/median
         confidence_level (float): Confidence level for the interval (0-1), default is 0.95 (95%)
+        cut_off (float): Minimum value to include in the series plot
 
     Returns:
         str: Path to the saved frame image
@@ -507,7 +511,6 @@ def create_frame(
                 all_data,
                 date,
                 confidence_level,
-                fixed_y_limits=True
             )
         elif date_objects and mean_values and median_values:
             # Plot mean values in red
@@ -567,6 +570,7 @@ def plot_confidence_interval(
     confidence_level: float = 0.95,
     fixed_y_limits: bool = True,
     sample_size: int = None,
+    cut_off: float = 0,
 ) -> None:
     """Create a seaborn lineplot with confidence intervals for each date.
     
@@ -578,7 +582,7 @@ def plot_confidence_interval(
         confidence_level (float): Confidence level for the interval (0-1)
         fixed_y_limits (bool): Whether to use fixed y-axis limits across all frames
         sample_size (int): Number of values to sample for each date
-    """
+        """
     # Prepare data for seaborn lineplot
     data_for_plot = []
     all_values = []
@@ -588,7 +592,7 @@ def plot_confidence_interval(
         # Get non-NaN, positive values for this date
         values = all_data[date_str].values.flatten()
         values = values[~np.isnan(values)]
-        values = values[values > 0]
+        values = values[values > cut_off]
         
         if len(values) > 0:
             # Store all values for y-axis limit calculation
