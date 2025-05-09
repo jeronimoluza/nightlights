@@ -313,31 +313,46 @@ def plot_nightlights(
     region_crs: int = 4326,
 ) -> Tuple[plt.Figure, plt.Axes]:
     """
-    Plot nightlights data from an h5 file using cartopy and matplotlib.
+    Plot nightlights data from a list of h5 files for a specific date using cartopy and matplotlib.
 
     Args:
-        file_path (str): Path to the h5 file
+        files (list): List of paths to h5 files
         variable_name (str): Name of the variable to plot
+        date (str): Date string to filter files by (format: YYYY-MM-DD)
         output_dir (str, optional): Directory to save the plot. If None, the plot will be displayed.
         log_scale (bool): Whether to apply log scaling
         cmap (str): Colormap to use for the plot
         vmin (float, optional): Minimum value for color scaling
         vmax (float, optional): Maximum value for color scaling
+        region (shapely.geometry.Polygon, optional): Region to filter by
+        region_crs (int): Coordinate reference system of the region
 
     Returns:
         tuple: (fig, ax) matplotlib figure and axis objects
     """
+    # Group files by date
     files_by_date = group_files_by_date(files)
-    for datestr, date_files in files_by_date.items():
-        if datestr == date:
-            # Process files for this date
-            combined_data = process_files_for_date(
-                date_files, variable_name, region, region_crs
-            )
-    # Extract data from the h5 file
-    data, lons, lats = prepare_data(
-        , variable_name, log_scale, region, region_crs
-    )
+    combined_data = None
+    
+    # Find files for the requested date
+    if date in files_by_date:
+        # Process files for this date
+        combined_data = process_files_for_date(
+            files_by_date[date], variable_name, region, region_crs
+        )
+    else:
+        print(f"No files found for date: {date}")
+        print(f"Available dates: {list(files_by_date.keys())}")
+        return None, None
+    
+    if combined_data is None:
+        print(f"Failed to process data for date: {date}")
+        return None, None
+        
+    # Extract data arrays from the combined data
+    data = combined_data.values
+    lons = combined_data.x.values
+    lats = combined_data.y.values
 
     # Create a figure with a map projection and common features
     fig, ax = setup_map_figure()
@@ -357,14 +372,13 @@ def plot_nightlights(
     )
 
     # Add a colorbar
-    add_colorbar(ax, mesh, variable_name, log_scale)
+    add_colorbar(ax, mesh, log_scale=True)
 
     # Set the extent to the data bounds
     set_map_extent(ax, (lons, lats))
 
-    # Add title with filename
-    filename = os.path.basename(file_path)
-    title = f"Nightlights: {filename}\nVariable: {variable_name}"
+    # Add title with date and variable information
+    title = f"Nightlights: {date}\nDate: {date}\nVariable: {variable_name}"
     if log_scale:
         title += "\nLog Scale"
     plt.title(title)
@@ -373,7 +387,7 @@ def plot_nightlights(
     if output_dir:
         os.makedirs(output_dir, exist_ok=True)
         output_path = os.path.join(
-            output_dir, f"{os.path.splitext(filename)[0]}_{variable_name}.png"
+            output_dir, f"nightlights_{date}_{variable_name}.png"
         )
         plt.savefig(output_path, dpi=300, bbox_inches="tight")
         print(f"Plot saved to: {output_path}")
@@ -657,7 +671,7 @@ def create_frame(
     )
 
     # Add a colorbar
-    add_colorbar(ax, mesh, variable_name, log_scale=True)
+    add_colorbar(ax, mesh, log_scale=True)
 
     # Set the extent based on region or data bounds
     if region is not None:
