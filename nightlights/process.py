@@ -35,7 +35,7 @@ def load_data_from_h5(
         filename = path.split("/")[-1].replace(".h5", "")
         tile = [x for x in filename.split(".") if ("h" in x) and ("v" in x)][0]
         julian_date = filename.split(".")[1].replace("A", "")
-        
+
         try:
             calendar_date = (
                 datetime.datetime.strptime(julian_date, "%Y%j")
@@ -44,7 +44,7 @@ def load_data_from_h5(
             )
         except ValueError:
             calendar_date = ""
-        
+
         # Extract horizontal and vertical tile numbers from the filename
         try:
             h_num = int(tile.split("h")[1].split("v")[0])
@@ -52,7 +52,7 @@ def load_data_from_h5(
         except (IndexError, ValueError):
             h_num = 0
             v_num = 0
-            
+
         # Calculate bounds based on tile numbers
         west_bound = (10 * h_num) - 180
         north_bound = 90 - (10 * v_num)
@@ -93,7 +93,7 @@ def load_data_from_h5(
                     "west_bound": west_bound,
                     "north_bound": north_bound,
                     "east_bound": east_bound,
-                    "south_bound": south_bound
+                    "south_bound": south_bound,
                 }
 
                 # If we have a fill value, make sure it's properly applied
@@ -132,7 +132,7 @@ def load_data_from_h5(
             "west_bound": west_bound,
             "north_bound": north_bound,
             "east_bound": east_bound,
-            "south_bound": south_bound
+            "south_bound": south_bound,
         }
 
         return data, metadata, data_obj
@@ -293,9 +293,11 @@ def corners_to_geometry(df):
     return df
 
 
-
 def polygonize_file(
-    path: str, variable_name: str, region: Polygon | MultiPolygon = None, region_crs: int = 4326
+    path: str,
+    variable_name: str,
+    region: Polygon | MultiPolygon = None,
+    region_crs: int = 4326,
 ) -> gpd.GeoDataFrame:
     """
     Process a raster file containing Black Marble data and return a GeoDataFrame with polygonized pixels.
@@ -312,45 +314,51 @@ def polygonize_file(
     """
     # Use load_data_from_h5 to get the data and metadata
     _, metadata, _ = load_data_from_h5(path, variable_name, region, region_crs)
-    
+
     # Extract metadata information
     Tile = metadata["tile"]
     Calendar_date = metadata["calendar_date"]
-    
+
     # Get bounds from metadata
     WestBoundCoord = metadata["west_bound"]
     NorthBoundCoord = metadata["north_bound"]
     EastBoundCoord = metadata["east_bound"]
     SouthBoundCoord = metadata["south_bound"]
-    
+
     # Get dimensions
     longitude_pixels = len(metadata["lons"])
     latitude_pixels = len(metadata["lats"])
-    
+
     # Calculate pixel size
     long_pixel_length = (EastBoundCoord - WestBoundCoord) / longitude_pixels
     lat_pixel_length = (NorthBoundCoord - SouthBoundCoord) / latitude_pixels
-    
+
     # Prepare the data (apply scaling, offset, etc.)
-    data, lons, lats = prepare_data(path, variable_name, log_scale=False, region=region, region_crs=region_crs)
-    
+    data, lons, lats = prepare_data(
+        path,
+        variable_name,
+        log_scale=False,
+        region=region,
+        region_crs=region_crs,
+    )
+
     # Create a list to store the pixel information
     pixels = []
-    
+
     # Iterate through each pixel in the data array
     for i in range(data.shape[0]):
         for j in range(data.shape[1]):
             # Get the pixel value
             value = data[i, j]
-            
+
             # Skip NaN values
             if np.isnan(value):
                 continue
-            
+
             # Get coordinates
             lon = lons[j]
             lat = lats[i]
-            
+
             # Calculate corners
             loncorner0 = lon - long_pixel_length / 2
             latcorner0 = lat - lat_pixel_length / 2
@@ -360,7 +368,7 @@ def polygonize_file(
             latcorner2 = lat + lat_pixel_length / 2
             loncorner3 = lon - long_pixel_length / 2
             latcorner3 = lat + lat_pixel_length / 2
-            
+
             # Create polygon from corners
             corners = [
                 (loncorner0, latcorner0),
@@ -370,20 +378,24 @@ def polygonize_file(
                 (loncorner0, latcorner0),
             ]
             polygon = Polygon(corners)
-            
+
             # Add the pixel information to the list
-            pixels.append({
-                "tile": Tile,
-                "date": Calendar_date,
-                "variable": variable_name,
-                "value": value,
-                "geometry": polygon.wkt
-            })
-    
+            pixels.append(
+                {
+                    "tile": Tile,
+                    "date": Calendar_date,
+                    "variable": variable_name,
+                    "value": value,
+                    "geometry": polygon.wkt,
+                }
+            )
+
     # Create a GeoDataFrame from the pixel information
     if pixels:
         df = pd.DataFrame(pixels)
-        gdf = gpd.GeoDataFrame(df, geometry=gpd.GeoSeries.from_wkt(df["geometry"]), crs=region_crs)
+        gdf = gpd.GeoDataFrame(
+            df, geometry=gpd.GeoSeries.from_wkt(df["geometry"]), crs=region_crs
+        )
         return gdf
     else:
         # Return an empty GeoDataFrame if no pixels were processed
@@ -391,13 +403,13 @@ def polygonize_file(
 
 
 def polygonize(
-    list_of_files: list, 
-    variable_name: str, 
-    region: Polygon | MultiPolygon = None, 
+    list_of_files: list,
+    variable_name: str,
+    region: Polygon | MultiPolygon = None,
     region_crs: int = 4326,
     batch_process: bool = False,
     extraction_dir: str = None,
-    output_dir: str = None
+    output_dir: str = None,
 ) -> Union[gpd.GeoDataFrame, None]:
     """
     Polygonize multiple raster files containing Black Marble data.
@@ -416,8 +428,10 @@ def polygonize(
     """
     if batch_process:
         if extraction_dir is None or output_dir is None:
-            raise ValueError("extraction_dir and output_dir must be provided when batch_process is True")
-        
+            raise ValueError(
+                "extraction_dir and output_dir must be provided when batch_process is True"
+            )
+
         os.makedirs(extraction_dir, exist_ok=True)
         os.makedirs(output_dir, exist_ok=True)
 
@@ -426,7 +440,10 @@ def polygonize(
             filename = file.split("/")[-1]
             output_file = filename.replace(".h5", ".csv")
             gdf = polygonize_file(
-                file, variable_name=variable_name, region=region, region_crs=region_crs
+                file,
+                variable_name=variable_name,
+                region=region,
+                region_crs=region_crs,
             )
             gdf.to_csv(f"{extraction_dir}/{output_file}", index=None)
 
@@ -446,14 +463,17 @@ def polygonize(
             print(f"Output file is at {output_dir}/output.csv")
         else:
             print("No files were processed")
-        
+
         return None
     else:
         # Process all files and return a combined GeoDataFrame
         output = []
         for file in tqdm(list_of_files, desc="Processing files"):
             gdf = polygonize_file(
-                file, variable_name=variable_name, region=region, region_crs=region_crs
+                file,
+                variable_name=variable_name,
+                region=region,
+                region_crs=region_crs,
             )
             output.append(gdf)
 
@@ -507,5 +527,3 @@ def process_files_for_date(
             print(f"Error processing file {file}: {e}")
 
     return combined_data
-
-
