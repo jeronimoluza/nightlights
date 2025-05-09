@@ -51,6 +51,7 @@ if __name__ == "__main__":
     )
     print(gdf.head())
     print(gdf.tail())
+    gdf[gdf.date.isin(["2019-03-01", "2019-03-02"])].to_csv("date.csv")
     plotting.create_timelapse_gif(
         files,
         variable_name=variable_name,

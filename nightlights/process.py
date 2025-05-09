@@ -73,6 +73,22 @@ def load_data_from_h5(
                 # Extract the data array and coordinates after clipping
                 data = data_var.data
 
+                # Get the dimensions of the data array
+                if data.ndim > 2:
+                    # If there are multiple bands, get the dimensions of the first band
+                    longitude_pixels = data.shape[2]
+                    latitude_pixels = data.shape[1]
+                else:
+                    # If there's only one band, get the dimensions directly
+                    longitude_pixels = data.shape[1]
+                    latitude_pixels = data.shape[0]
+
+                # Calculate pixel size based on the actual data dimensions
+                lon_min, lon_max = data_var.x.min().item(), data_var.x.max().item()
+                lat_min, lat_max = data_var.y.min().item(), data_var.y.max().item()
+                long_pixel_length = (lon_max - lon_min) / (longitude_pixels - 1)
+                lat_pixel_length = (lat_max - lat_min) / (latitude_pixels - 1)
+
                 # Update the metadata to include the new coordinates
                 metadata = {
                     "fill_value": fill_value,
@@ -94,6 +110,10 @@ def load_data_from_h5(
                     "north_bound": north_bound,
                     "east_bound": east_bound,
                     "south_bound": south_bound,
+                    "longitude_pixels": longitude_pixels,
+                    "latitude_pixels": latitude_pixels,
+                    "long_pixel_length": long_pixel_length,
+                    "lat_pixel_length": lat_pixel_length
                 }
 
                 # If we have a fill value, make sure it's properly applied
@@ -106,36 +126,56 @@ def load_data_from_h5(
                 return data, metadata, data_var
             else:
                 data = data_var.data
+
+                # Get the dimensions of the data array
+                if data.ndim > 2:
+                    # If there are multiple bands, get the dimensions of the first band
+                    longitude_pixels = data.shape[2]
+                    latitude_pixels = data.shape[1]
+                else:
+                    # If there's only one band, get the dimensions directly
+                    longitude_pixels = data.shape[1]
+                    latitude_pixels = data.shape[0]
+
+                # Calculate pixel size based on the actual data dimensions
+                lon_min, lon_max = data_obj.x.min().item(), data_obj.x.max().item()
+                lat_min, lat_max = data_obj.y.min().item(), data_obj.y.max().item()
+                long_pixel_length = (lon_max - lon_min) / (longitude_pixels - 1)
+                lat_pixel_length = (lat_max - lat_min) / (latitude_pixels - 1)
+
+                # Extract metadata
+                metadata = {
+                    "fill_value": data_obj.attrs.get(f"{var_path}__FillValue"),
+                    "scale_factor": data_obj.attrs.get(
+                        f"{var_path}_scale_factor", 1.0
+                    ),
+                    "offset": data_obj.attrs.get(f"{var_path}_offset", 0.0),
+                    "product": data_obj.attrs.get("ShortName", ""),
+                    "date": data_obj.attrs.get("RangeBeginningdate", ""),
+                    "lons": data_obj.x.values,
+                    "lats": data_obj.y.values,
+                    "filename": filename,
+                    "tile": tile,
+                    "julian_date": julian_date,
+                    "calendar_date": calendar_date,
+                    "horizontal_tile_number": h_num,
+                    "vertical_tile_number": v_num,
+                    "west_bound": west_bound,
+                    "north_bound": north_bound,
+                    "east_bound": east_bound,
+                    "south_bound": south_bound,
+                    "longitude_pixels": longitude_pixels,
+                    "latitude_pixels": latitude_pixels,
+                    "long_pixel_length": long_pixel_length,
+                    "lat_pixel_length": lat_pixel_length
+                }
+
+                return data, metadata, data_obj
         except KeyError:
             raise ValueError(
                 f"Variable {variable_name} not found in file {path}\n"
                 f"Available variables: {list(data_obj.var())}"
             )
-
-        # Extract metadata
-        metadata = {
-            "fill_value": data_obj.attrs.get(f"{var_path}__FillValue"),
-            "scale_factor": data_obj.attrs.get(
-                f"{var_path}_scale_factor", 1.0
-            ),
-            "offset": data_obj.attrs.get(f"{var_path}_offset", 0.0),
-            "product": data_obj.attrs.get("ShortName", ""),
-            "date": data_obj.attrs.get("RangeBeginningdate", ""),
-            "lons": data_obj.x.values,
-            "lats": data_obj.y.values,
-            "filename": filename,
-            "tile": tile,
-            "julian_date": julian_date,
-            "calendar_date": calendar_date,
-            "horizontal_tile_number": h_num,
-            "vertical_tile_number": v_num,
-            "west_bound": west_bound,
-            "north_bound": north_bound,
-            "east_bound": east_bound,
-            "south_bound": south_bound,
-        }
-
-        return data, metadata, data_obj
 
 
 def prepare_data(
@@ -319,19 +359,9 @@ def polygonize_file(
     Tile = metadata["tile"]
     Calendar_date = metadata["calendar_date"]
 
-    # Get bounds from metadata
-    WestBoundCoord = metadata["west_bound"]
-    NorthBoundCoord = metadata["north_bound"]
-    EastBoundCoord = metadata["east_bound"]
-    SouthBoundCoord = metadata["south_bound"]
-
-    # Get dimensions
-    longitude_pixels = len(metadata["lons"])
-    latitude_pixels = len(metadata["lats"])
-
-    # Calculate pixel size
-    long_pixel_length = (EastBoundCoord - WestBoundCoord) / longitude_pixels
-    lat_pixel_length = (NorthBoundCoord - SouthBoundCoord) / latitude_pixels
+    # Get pixel size directly from metadata
+    long_pixel_length = metadata["long_pixel_length"]
+    lat_pixel_length = metadata["lat_pixel_length"]
 
     # Prepare the data (apply scaling, offset, etc.)
     data, lons, lats = prepare_data(
@@ -359,15 +389,15 @@ def polygonize_file(
             lon = lons[j]
             lat = lats[i]
 
-            # Calculate corners
-            loncorner0 = lon - long_pixel_length / 2
-            latcorner0 = lat - lat_pixel_length / 2
-            loncorner1 = lon + long_pixel_length / 2
-            latcorner1 = lat - lat_pixel_length / 2
-            loncorner2 = lon + long_pixel_length / 2
-            latcorner2 = lat + lat_pixel_length / 2
-            loncorner3 = lon - long_pixel_length / 2
-            latcorner3 = lat + lat_pixel_length / 2
+            # Calculate corners - use half the pixel size for more accurate polygons
+            loncorner0 = lon - (long_pixel_length / 2)
+            latcorner0 = lat - (lat_pixel_length / 2)
+            loncorner1 = lon + (long_pixel_length / 2)
+            latcorner1 = lat - (lat_pixel_length / 2)
+            loncorner2 = lon + (long_pixel_length / 2)
+            latcorner2 = lat + (lat_pixel_length / 2)
+            loncorner3 = lon - (long_pixel_length / 2)
+            latcorner3 = lat + (lat_pixel_length / 2)
 
             # Create polygon from corners
             corners = [
