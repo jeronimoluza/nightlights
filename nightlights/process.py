@@ -611,7 +611,6 @@ def polygonize_optimized(
                     
         except Exception as e:
             print(f"Error processing file {file}: {e}")
-            traceback.print_exc()
     
     if not all_pixel_data:
         return gpd.GeoDataFrame(geometry=[], crs=region_crs)
@@ -620,6 +619,7 @@ def polygonize_optimized(
     
     # Create DataFrame with all pixel data
     df = pd.DataFrame(all_pixel_data)
+
     
     # Create a lookup DataFrame with pixel IDs and geometries
     geometry_df = pd.DataFrame({
