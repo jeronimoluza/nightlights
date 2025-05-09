@@ -508,6 +508,9 @@ def create_timelapse_gif(
             print("No valid data found for any date. Cannot create timelapse.")
             return
 
+        # Prepare to create frames for each date with consistent color scaling
+                
+        
         # Create a frame for each date with consistent color scaling
         frame_paths = []
         sorted_dates = sorted(date_data_dict.keys())
@@ -730,6 +733,7 @@ def create_frame(
                 all_data,
                 date,
                 confidence_level,
+                fixed_y_limits=True
             )
         elif date_objects and mean_values and median_values:
             # Plot mean values in red
@@ -787,6 +791,7 @@ def plot_confidence_interval(
     all_data: Dict[str, xr.DataArray], 
     current_date: str,
     confidence_level: float = 0.95,
+    fixed_y_limits: bool = True,
 ) -> None:
     """Create a seaborn lineplot with confidence intervals for each date.
     
@@ -796,10 +801,11 @@ def plot_confidence_interval(
         all_data (Dict[str, xr.DataArray]): Dictionary of all data by date
         current_date (str): The current date being displayed in the main plot
         confidence_level (float): Confidence level for the interval (0-1)
-        variable_name (str, optional): Name of the variable being plotted
+        fixed_y_limits (bool): Whether to use fixed y-axis limits across all frames
     """
     # Prepare data for seaborn lineplot
     data_for_plot = []
+    all_values = []
     
     # Process data for each date
     for date_str in all_dates:
@@ -809,12 +815,15 @@ def plot_confidence_interval(
         values = values[values > 0]
         
         if len(values) > 0:
+            # Store all values for y-axis limit calculation
+            all_values.extend(values)
+            
             # Create multiple entries for each date to allow for proper CI calculation
             # Sample the data if there are too many points to keep performance reasonable
-            if len(values) > 10000:
-                # Random sampling to reduce data size while preserving distribution
-                indices = np.random.choice(len(values), size=10000, replace=False)
-                values = values[indices]
+            # if len(values) > 10000:
+            #     # Random sampling to reduce data size while preserving distribution
+            #     indices = np.random.choice(len(values), size=10000, replace=False)
+            #     values = values[indices]
                 
             # Create a dataframe entry for each value
             for val in values:
@@ -851,6 +860,20 @@ def plot_confidence_interval(
         linewidth=1.5,
         label='Current Date'
     )
+    
+    # Calculate and set fixed y-axis limits if requested
+    if fixed_y_limits and all_values:
+        # Calculate percentiles to exclude extreme outliers
+        y_min = np.percentile(all_values, 1)  # 1st percentile
+        y_max = np.percentile(all_values, 95)  # 95th percentile
+        
+        # Add some padding
+        y_range = y_max - y_min
+        y_min = max(0, y_min - 0.05 * y_range)  # Ensure it's not negative
+        y_max = y_max + 0.05 * y_range
+        
+        # Set the limits
+        ax.set_ylim(y_min, y_max)
     
     # Format x-axis to show dates nicely
     ax.xaxis.set_major_formatter(
