@@ -1,11 +1,23 @@
+"""Module for processing nightlights data from h5 files."""
+
 from tqdm import tqdm
 import os
 import datetime
 import pandas as pd
 import geopandas as gpd
 import numpy as np
+import xarray as xr
 import rioxarray as rxr
 from shapely import Polygon, MultiPolygon
+from typing import Dict, List, Tuple, Union, Optional
+
+from nightlights.utils import (
+    load_data_from_h5, 
+    prepare_data, 
+    create_dataarray_from_raw,
+    group_files_by_date,
+    PREFIX
+)
 
 
 def process_file(
@@ -201,6 +213,50 @@ def process_files(
     output = pd.concat(output).reset_index(drop=True)
     gdf = corners_to_geometry(output)
     return gdf
+
+
+def process_files_for_date(
+    files: List[str], variable_name: str, region=None, region_crs: int = 4326
+) -> xr.DataArray:
+    """Process files for a specific date and return combined data.
+
+    Args:
+        files (list): List of h5 file paths for a specific date
+        variable_name (str): Name of the variable to extract
+        region (shapely.geometry.Polygon, optional): Region to filter by
+        region_crs (int): Coordinate reference system of the region
+
+    Returns:
+        xarray.DataArray: Combined data for the date
+    """
+    combined_data = None
+
+    for file in files:
+        try:
+            # Extract data and prepare it
+            data, lons, lats = prepare_data(
+                file,
+                variable_name,
+                log_scale=True,
+                region=region,
+                region_crs=region_crs,
+            )
+
+            # Create xarray DataArray
+            da = create_dataarray_from_raw(data, lons, lats)
+
+            # First file - initialize the combined array
+            if combined_data is None:
+                combined_data = da
+            else:
+                # Try to align and merge with existing data
+                # For simplicity, we'll take the maximum value at each pixel
+                combined_data = xr.concat([combined_data, da], dim="tile")
+                combined_data = combined_data.max(dim="tile", skipna=True)
+        except Exception as e:
+            print(f"Error processing file {file}: {e}")
+
+    return combined_data
 
 
 def batch_process_files(

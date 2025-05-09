@@ -1,206 +1,37 @@
+"""Module for visualizing nightlights data."""
+
 import matplotlib.pyplot as plt
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 import numpy as np
 import os
-import rioxarray as rxr
-from pathlib import Path
 import xarray as xr
-from shapely.geometry import box
+from pathlib import Path
 from tqdm import tqdm
-from collections import defaultdict
 import imageio.v2 as imageio
 from datetime import datetime
 from typing import Dict, List, Tuple, Union, Optional
 import seaborn as sns
 import pandas as pd
-import matplotlib.pyplot as plt
+
+from nightlights.utils import (
+    DEFAULT_CMAP,
+    DEFAULT_BUFFER,
+    MAP_BACKGROUND_COLOR,
+    MAP_COASTLINE_COLOR,
+    MAP_BORDER_COLOR,
+    MAP_STATE_COLOR,
+    MAP_GRID_COLOR,
+    MAP_WATER_COLOR,
+    prepare_data,
+    create_dataarray_from_raw,
+    group_files_by_date
+)
+
+from nightlights.process import process_files_for_date
 
 
-# Constants
-PREFIX = "HDFEOS_GRIDS_VIIRS_Grid_DNB_2d_Data_Fields_"
-DEFAULT_CMAP = "cividis"
-DEFAULT_BUFFER = 0.2  # degrees
 
-# Map styling parameters
-MAP_BACKGROUND_COLOR = "white"  # Background color for cartopy maps
-MAP_COASTLINE_COLOR = "black"  # Color for coastlines
-MAP_BORDER_COLOR = "gray"  # Color for country borders
-MAP_STATE_COLOR = "gray"  # Color for state/province borders
-MAP_GRID_COLOR = "gray"  # Color for gridlines
-MAP_WATER_COLOR = "lightblue"  # Color for water bodies (ocean, lakes, rivers)
-
-
-def load_data_from_h5(
-    path: str, variable_name: str, region=None, region_crs: int = 4326
-) -> Tuple[np.ndarray, dict, xr.DataArray]:
-    """
-    Load raw data and metadata from an h5 file.
-
-    Args:
-        path (str): Path to the h5 file
-        variable_name (str): Name of the variable to extract
-
-    Returns:
-        tuple: (data, metadata, data_obj) arrays and metadata for processing
-    """
-    with rxr.open_rasterio(path) as data_obj:
-
-        var_path = f"{PREFIX}{variable_name}"
-        try:
-            # Get the data first
-            data_var = data_obj[var_path]
-            fill_value = data_obj.attrs.get(f"{var_path}__FillValue")
-
-            # Apply region clipping if provided
-            if region is not None:
-                # Use rio.clip to clip the data to the region
-                data_var = data_var.rio.clip([region], region_crs, drop=True)
-
-                # Extract the data array and coordinates after clipping
-                data = data_var.data
-
-                # Update the metadata to include the new coordinates
-                metadata = {
-                    "fill_value": fill_value,
-                    "scale_factor": data_obj.attrs.get(
-                        f"{var_path}_scale_factor", 1.0
-                    ),
-                    "offset": data_obj.attrs.get(f"{var_path}_offset", 0.0),
-                    "product": data_obj.attrs.get("ShortName", ""),
-                    "date": data_obj.attrs.get("RangeBeginningdate", ""),
-                    "lons": data_var.x.values,  # Use clipped coordinates
-                    "lats": data_var.y.values,  # Use clipped coordinates
-                }
-
-                # If we have a fill value, make sure it's properly applied
-                if fill_value is not None:
-                    # Create a mask for values that should be NaN
-                    mask = np.isclose(data, fill_value) | np.isnan(data)
-                    data = np.where(mask, np.nan, data)
-
-                # Return early with the clipped data and updated metadata
-                return data, metadata, data_var
-            else:
-                data = data_var.data
-        except KeyError:
-            raise ValueError(
-                f"Variable {variable_name} not found in file {path}\n"
-                f"Available variables: {list(data_obj.var())}"
-            )
-
-        # Extract metadata
-        metadata = {
-            "fill_value": data_obj.attrs.get(f"{var_path}__FillValue"),
-            "scale_factor": data_obj.attrs.get(
-                f"{var_path}_scale_factor", 1.0
-            ),
-            "offset": data_obj.attrs.get(f"{var_path}_offset", 0.0),
-            "product": data_obj.attrs.get("ShortName", ""),
-            "date": data_obj.attrs.get("RangeBeginningdate", ""),
-            "lons": data_obj.x.values,
-            "lats": data_obj.y.values,
-        }
-
-        return data, metadata, data_obj
-
-
-def prepare_data(
-    path: str,
-    variable_name: str,
-    log_scale: bool = True,
-    region=None,
-    region_crs: int = 4326,
-) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """
-    Extract and prepare data from an h5 file.
-
-    Args:
-        path (str): Path to the h5 file
-        variable_name (str): Name of the variable to extract
-        log_scale (bool): Whether to apply log scaling
-
-    Returns:
-        tuple: (data, lons, lats) arrays for plotting
-    """
-    data, metadata, _ = load_data_from_h5(
-        path, variable_name, region, region_crs
-    )
-
-    # First replace fill values with NaN, then apply scaling and offset
-    if metadata["fill_value"] is not None:
-        data = np.where(
-            np.isclose(data, metadata["fill_value"]) | np.isnan(data),
-            np.nan,
-            data,
-        )
-    data = data * metadata["scale_factor"] + metadata["offset"]
-
-    # Apply log scaling if requested
-    if log_scale:
-        data = np.log(data + 1)  # Add 1 to avoid log(0)
-
-    # Get the first band (assuming single band data)
-    if data.ndim > 2:
-        data = data[0]  # Get the first band if there are multiple bands
-
-    return data, metadata["lons"], metadata["lats"]
-
-
-def create_dataarray_from_raw(
-    data: np.ndarray, lons: np.ndarray, lats: np.ndarray, attrs: dict = None
-) -> xr.DataArray:
-    """
-    Create an xarray DataArray from raw data arrays.
-
-    Args:
-        data (np.ndarray): Data array
-        lons (np.ndarray): Longitude coordinates
-        lats (np.ndarray): Latitude coordinates
-        attrs (dict): Attributes to add to the DataArray
-
-    Returns:
-        xr.DataArray: DataArray with the data and coordinates
-    """
-    # Make sure the dimensions match
-    if data.shape[0] != len(lats) or data.shape[1] != len(lons):
-        # If data shape doesn't match coordinates, we need to fix it
-        if isinstance(data, np.ndarray) and data.ndim == 2:
-            # If data is a 2D array, we can create new coordinates that match
-            print(
-                f"Warning: Data shape {data.shape} doesn't match coordinates ({len(lats)}, {len(lons)}). Creating new coordinates."
-            )
-            # Create new coordinate arrays that match the data dimensions
-            if len(lats) > 1 and len(lons) > 1:
-                lat_step = (lats[-1] - lats[0]) / (len(lats) - 1)
-                lon_step = (lons[-1] - lons[0]) / (len(lons) - 1)
-                new_lats = np.linspace(
-                    lats[0],
-                    lats[0] + lat_step * (data.shape[0] - 1),
-                    data.shape[0],
-                )
-                new_lons = np.linspace(
-                    lons[0],
-                    lons[0] + lon_step * (data.shape[1] - 1),
-                    data.shape[1],
-                )
-                lats, lons = new_lats, new_lons
-            else:
-                # If we have only one coordinate, we need to create a new array
-                lats = np.linspace(
-                    lats[0] if len(lats) > 0 else 0,
-                    lats[0] + 1 if len(lats) > 0 else 1,
-                    data.shape[0],
-                )
-                lons = np.linspace(
-                    lons[0] if len(lons) > 0 else 0,
-                    lons[0] + 1 if len(lons) > 0 else 1,
-                    data.shape[1],
-                )
-
-    return xr.DataArray(
-        data, dims=["y", "x"], coords={"y": lats, "x": lons}, attrs=attrs or {}
-    )
 
 
 def setup_map_figure(
@@ -399,26 +230,7 @@ def plot_nightlights(
     return fig, ax
 
 
-def group_files_by_date(files: List[str]) -> Dict[str, List[str]]:
-    """Group files by their date.
 
-    Args:
-        files (list): List of h5 file paths
-
-    Returns:
-        dict: Dictionary mapping dates to lists of files
-    """
-    files_by_date = defaultdict(list)
-
-    for file in tqdm(files, desc="Grouping files by date"):
-        try:
-            with rxr.open_rasterio(file) as data_obj:
-                date = data_obj.attrs.get("RangeBeginningDate", "unknown")
-                files_by_date[date].append(file)
-        except Exception as e:
-            print(f"Error reading date from {file}: {e}")
-
-    return files_by_date
 
 
 def create_timelapse_gif(
@@ -544,47 +356,7 @@ def create_timelapse_gif(
         print(f"Timelapse GIF created at: {gif_path}")
 
 
-def process_files_for_date(
-    files: List[str], variable_name: str, region=None, region_crs: int = 4326
-) -> xr.DataArray:
-    """Process files for a specific date and return combined data.
 
-    Args:
-        files (list): List of h5 file paths for a specific date
-        variable_name (str): Name of the variable to extract
-        region (shapely.geometry.Polygon, optional): Region to filter by
-
-    Returns:
-        xarray.DataArray: Combined data for the date
-    """
-    combined_data = None
-
-    for file in files:
-        try:
-            # Extract data and prepare it
-            data, lons, lats = prepare_data(
-                file,
-                variable_name,
-                log_scale=True,
-                region=region,
-                region_crs=region_crs,
-            )
-
-            # Create xarray DataArray
-            da = create_dataarray_from_raw(data, lons, lats)
-
-            # First file - initialize the combined array
-            if combined_data is None:
-                combined_data = da
-            else:
-                # Try to align and merge with existing data
-                # For simplicity, we'll take the maximum value at each pixel
-                combined_data = xr.concat([combined_data, da], dim="tile")
-                combined_data = combined_data.max(dim="tile", skipna=True)
-        except Exception as e:
-            print(f"Error processing file {file}: {e}")
-
-    return combined_data
 
 
 def create_frame(
@@ -820,10 +592,10 @@ def plot_confidence_interval(
             
             # Create multiple entries for each date to allow for proper CI calculation
             # Sample the data if there are too many points to keep performance reasonable
-            # if len(values) > 10000:
+            if len(values) > 10000:
             #     # Random sampling to reduce data size while preserving distribution
-            #     indices = np.random.choice(len(values), size=10000, replace=False)
-            #     values = values[indices]
+                indices = np.random.choice(len(values), size=10000, replace=False)
+                values = values[indices]
                 
             # Create a dataframe entry for each value
             for val in values:

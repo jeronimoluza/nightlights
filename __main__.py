@@ -27,13 +27,19 @@ if __name__ == "__main__":
     # "POLYGON((70.287 34.5157, 74.5148 34.5157, 74.5148 31.3723, 70.287 31.3723, 70.287 34.5157))"
     # )
 
-    country="Uruguay"
-    # country="Venezuela"
-    gdf = gpd.read_file(
-        "https://raw.githubusercontent.com/datasets/geo-boundaries-world-110m/refs/heads/main/countries.geojson"
+    # country="Uruguay"
+    # # country="Venezuela"
+    # gdf = gpd.read_file(
+    #     "https://raw.githubusercontent.com/datasets/geo-boundaries-world-110m/refs/heads/main/countries.geojson"
+    # )
+    # region_crs = gdf.crs.to_epsg()
+    # region = gdf[gdf.name == country].geometry.values[0]
+
+    region = download.find_region(
+        query="Caracas, Venezuela",
     )
-    region_crs = gdf.crs.to_epsg()
-    region = gdf[gdf.name == country].geometry.values[0]
+    region_crs = region.crs.to_epsg()
+    region = region.geometry.values[0]
 
     files = download.download_earthaccess(
         download_dir=download_dir,
