@@ -11,7 +11,7 @@ import rioxarray as rxr
 from shapely import Polygon, MultiPolygon
 from typing import Dict, List, Tuple, Union, Optional
 from collections import defaultdict
-
+import traceback
 PREFIX = "HDFEOS_GRIDS_VIIRS_Grid_DNB_2d_Data_Fields_"
 
 
@@ -397,6 +397,245 @@ def polygonize_file(
         return gpd.GeoDataFrame(geometry=[], crs=region_crs)
 
 
+def generate_pixel_id(lon: float, lat: float) -> str:
+    """
+    Generate a unique ID for a pixel based on its longitude and latitude.
+    
+    Args:
+        lon (float): Longitude of the pixel center
+        lat (float): Latitude of the pixel center
+        
+    Returns:
+        str: A unique ID for the pixel
+    """
+    # Round to 6 decimal places (approx. 10cm precision) to ensure consistent IDs
+    # even with small floating point differences
+    lon_str = f"{lon:.6f}"
+    lat_str = f"{lat:.6f}"
+    # Create a hash from the coordinates
+    import hashlib
+    pixel_hash = hashlib.md5(f"{lon_str}_{lat_str}".encode()).hexdigest()
+    return pixel_hash
+
+
+def create_pixel_geometry(lon: float, lat: float, long_pixel_length: float, lat_pixel_length: float) -> Polygon:
+    """
+    Create a polygon geometry for a pixel based on its center coordinates and dimensions.
+    
+    Args:
+        lon (float): Longitude of the pixel center
+        lat (float): Latitude of the pixel center
+        long_pixel_length (float): Length of the pixel in longitude direction
+        lat_pixel_length (float): Length of the pixel in latitude direction
+        
+    Returns:
+        Polygon: A polygon geometry representing the pixel
+    """
+    # Calculate corners - use half the pixel size for more accurate polygons
+    loncorner0 = lon - (long_pixel_length / 2)
+    latcorner0 = lat - (lat_pixel_length / 2)
+    loncorner1 = lon + (long_pixel_length / 2)
+    latcorner1 = lat - (lat_pixel_length / 2)
+    loncorner2 = lon + (long_pixel_length / 2)
+    latcorner2 = lat + (lat_pixel_length / 2)
+    loncorner3 = lon - (long_pixel_length / 2)
+    latcorner3 = lat + (lat_pixel_length / 2)
+    
+    # Create polygon from corners
+    corners = [
+        (loncorner0, latcorner0),
+        (loncorner1, latcorner1),
+        (loncorner2, latcorner2),
+        (loncorner3, latcorner3),
+        (loncorner0, latcorner0),
+    ]
+    return Polygon(corners)
+
+
+def polygonize_optimized(
+    list_of_files: list,
+    variable_name: str,
+    region: Polygon | MultiPolygon = None,
+    region_crs: int = 4326,
+) -> gpd.GeoDataFrame:
+    """
+    Process multiple raster files using a two-pass optimized approach:
+    1. First pass: Map all coordinates and generate pixel geometries
+    2. Second pass: Process all files using the pre-generated pixel dictionary
+    
+    Args:
+        list_of_files (list): List of paths to raster files
+        variable_name (str): Name of the variable to extract
+        region (Polygon | MultiPolygon, optional): Region to clip the data to. Defaults to None.
+        region_crs (int, optional): CRS of the region. Defaults to 4326.
+        
+    Returns:
+        gpd.GeoDataFrame: A GeoDataFrame containing the polygonized pixels from all raster files.
+    """
+    # Dictionary to store pixel geometries
+    pixel_geometries = {}
+    # Dictionary to store pixel dimensions for each file
+    pixel_dimensions = {}
+    # Set to store all unique coordinates
+    all_coordinates = set()
+    
+    # FIRST PASS: Map all coordinates and collect pixel dimensions
+    for file in tqdm(list_of_files, desc="Mapping coordinates"):
+        try:
+            # Get data and metadata
+            data, metadata, _ = load_data_from_h5(file, variable_name, region, region_crs)
+            
+            if metadata is None:
+                continue
+            
+            # Get coordinate arrays
+            lons = metadata["lons"]
+            lats = metadata["lats"]
+            
+            # Handle extra dimensions in the data array
+            if data.ndim > 2:
+                if data.shape[0] == 1:
+                    data = np.squeeze(data, axis=0)
+                else:
+                    data = data[0]
+            
+            # Store pixel dimensions for this file
+            pixel_dimensions[file] = {
+                "long_pixel_length": metadata["long_pixel_length"],
+                "lat_pixel_length": metadata["lat_pixel_length"]
+            }
+            
+            # Add all valid coordinates to the set
+            for i in range(data.shape[0]):
+                for j in range(data.shape[1]):
+                    value = data[i, j]
+                    
+                    # Skip NaN values
+                    if isinstance(value, np.ndarray):
+                        if np.isnan(value).any() or value.size == 0:
+                            continue
+                    elif np.isnan(value):
+                        continue
+                    
+                    # Get coordinates
+                    lon = lons[j]
+                    lat = lats[i]
+                    
+                    # Add to set of all coordinates
+                    all_coordinates.add((lon, lat))
+                    
+        except Exception as e:
+            print(f"Error mapping coordinates in file {file}: {e}")
+    
+    # Generate all pixel geometries
+    print(f"Generating geometries for {len(all_coordinates)} unique coordinates...")
+    for lon, lat in tqdm(all_coordinates, desc="Generating pixel geometries"):
+        # Use the first file's pixel dimensions as reference
+        # (This is a simplification - in a real-world scenario, you might want to use the most common dimensions)
+        if not pixel_dimensions:
+            print("No valid pixel dimensions found. Cannot generate geometries.")
+            return gpd.GeoDataFrame(geometry=[], crs=region_crs)
+            
+        reference_dimensions = next(iter(pixel_dimensions.values()))
+        long_pixel_length = reference_dimensions["long_pixel_length"]
+        lat_pixel_length = reference_dimensions["lat_pixel_length"]
+        
+        # Generate pixel ID
+        pixel_id = generate_pixel_id(lon, lat)
+        
+        # Create geometry
+        geometry = create_pixel_geometry(lon, lat, long_pixel_length, lat_pixel_length)
+        pixel_geometries[pixel_id] = geometry.wkt
+    
+    # SECOND PASS: Process all files using the pre-generated pixel dictionary
+    all_pixel_data = []
+    
+    for file in tqdm(list_of_files, desc="Processing data"):
+        try:
+            # Get data and metadata
+            data, metadata, _ = load_data_from_h5(file, variable_name, region, region_crs)
+            
+            if metadata is None:
+                continue
+                
+            # Extract metadata information
+            tile = metadata["tile"]
+            calendar_date = metadata["calendar_date"]
+            
+            # Get coordinate arrays
+            lons = metadata["lons"]
+            lats = metadata["lats"]
+            
+            # Handle extra dimensions in the data array
+            if data.ndim > 2:
+                if data.shape[0] == 1:
+                    data = np.squeeze(data, axis=0)
+                else:
+                    data = data[0]
+            
+            # Process each pixel in the data array
+            for i in range(data.shape[0]):
+                for j in range(data.shape[1]):
+                    # Get the pixel value
+                    value = data[i, j]
+                    
+                    # Skip NaN values - handle both scalar and array values
+                    if isinstance(value, np.ndarray):
+                        if np.isnan(value).any() or value.size == 0:
+                            continue
+                        # Use the first value if it's an array
+                        value = float(value.flat[0])
+                    elif np.isnan(value):
+                        continue
+                    
+                    # Get coordinates
+                    lon = lons[j]
+                    lat = lats[i]
+                    
+                    # Generate pixel ID
+                    pixel_id = generate_pixel_id(lon, lat)
+                    
+                    # Skip if this pixel ID doesn't exist in our geometry dictionary
+                    # (This shouldn't happen if the first pass was successful)
+                    if pixel_id not in pixel_geometries:
+                        continue
+                    
+                    # Add pixel data
+                    all_pixel_data.append({
+                        "pixel_id": pixel_id,
+                        "tile": tile,
+                        "date": calendar_date,
+                        "variable": variable_name,
+                        "value": value,
+                    })
+                    
+        except Exception as e:
+            print(f"Error processing file {file}: {e}")
+            traceback.print_exc()
+    
+    if not all_pixel_data:
+        return gpd.GeoDataFrame(geometry=[], crs=region_crs)
+    
+    print(f"Creating final output with {len(all_pixel_data)} data points and {len(pixel_geometries)} unique geometries...")
+    
+    # Create DataFrame with all pixel data
+    df = pd.DataFrame(all_pixel_data)
+    
+    # Create a lookup DataFrame with pixel IDs and geometries
+    geometry_df = pd.DataFrame({
+        "pixel_id": list(pixel_geometries.keys()),
+        "geometry": list(pixel_geometries.values())
+    })
+    
+    # Merge data with geometries
+    merged_df = pd.merge(df, geometry_df, on="pixel_id")
+    
+    # Create GeoDataFrame
+    gdf = gpd.GeoDataFrame(merged_df, geometry=gpd.GeoSeries.from_wkt(merged_df["geometry"]), crs=region_crs)
+    
+    return gdf
+
+
 def polygonize(
     list_of_files: list,
     variable_name: str,
@@ -405,6 +644,7 @@ def polygonize(
     batch_process: bool = False,
     extraction_dir: str = None,
     output_dir: str = None,
+    optimize_geometry: bool = True,
 ) -> Union[gpd.GeoDataFrame, None]:
     """
     Polygonize multiple raster files containing Black Marble data.
@@ -417,6 +657,8 @@ def polygonize(
         batch_process (bool, optional): Whether to process files in batch mode, saving intermediate results. Defaults to False.
         extraction_dir (str, optional): Directory to save intermediate results. Required if batch_process is True.
         output_dir (str, optional): Directory to save final output. Required if batch_process is True.
+        optimize_geometry (bool, optional): Whether to optimize geometry creation by generating
+                                          pixel geometries only once. Defaults to True.
 
     Returns:
         Union[gpd.GeoDataFrame, None]: A GeoDataFrame containing the polygonized pixels from all files, or None if batch_process is True.
@@ -460,8 +702,11 @@ def polygonize(
             print("No files were processed")
 
         return None
+    elif optimize_geometry:
+        # Use the optimized approach with pixel IDs
+        return polygonize_optimized(list_of_files, variable_name, region, region_crs)
     else:
-        # Process all files and return a combined GeoDataFrame
+        # Process all files and return a combined GeoDataFrame using the standard approach
         output = []
         for file in tqdm(list_of_files, desc="Processing files"):
             gdf = polygonize_file(

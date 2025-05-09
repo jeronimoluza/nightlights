@@ -1,7 +1,8 @@
-from shapely import wkt
-import geopandas as gpd
 
-if __name__ == "__main__":
+def do_main():
+    from shapely import wkt
+    import geopandas as gpd
+    import pandas as pd
 
     from nightlights import download, plotting, process
 
@@ -46,15 +47,14 @@ if __name__ == "__main__":
     #     region=region,
     # )
 
-    gdf = process.polygonize(
-        files, variable_name=variable_name, region=region, region_crs=region_crs
-    )
-    gdf['datetimestr'] = gdf.date.dt.strftime('%Y-%m-%d 00:00:00')
-    gdf.to_csv('test.csv')
+    # Use the optimized polygonization approach (default behavior)
+    # gdf = process.polygonize(
+    #     files, variable_name=variable_name, region=region, region_crs=region_crs, optimize_geometry=True
+    # )
     plotting.create_timelapse_gif(
         files,
         variable_name=variable_name,
-        title="Ethiopia Through the Years",
+        title="Buenos Aires Through the Years",
         output_dir=plot_dir,
         region=region,
         fps=2.0,
@@ -64,3 +64,5 @@ if __name__ == "__main__":
         #cut_off=0.5,
     )
 
+if __name__ == "__main__":
+    do_main()
