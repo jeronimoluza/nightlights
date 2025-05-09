@@ -566,6 +566,7 @@ def plot_confidence_interval(
     current_date: str,
     confidence_level: float = 0.95,
     fixed_y_limits: bool = True,
+    sample_size: int = None,
 ) -> None:
     """Create a seaborn lineplot with confidence intervals for each date.
     
@@ -576,6 +577,7 @@ def plot_confidence_interval(
         current_date (str): The current date being displayed in the main plot
         confidence_level (float): Confidence level for the interval (0-1)
         fixed_y_limits (bool): Whether to use fixed y-axis limits across all frames
+        sample_size (int): Number of values to sample for each date
     """
     # Prepare data for seaborn lineplot
     data_for_plot = []
@@ -594,9 +596,9 @@ def plot_confidence_interval(
             
             # Create multiple entries for each date to allow for proper CI calculation
             # Sample the data if there are too many points to keep performance reasonable
-            if len(values) > 10000:
+            if sample_size is not None and len(values) > sample_size:
             #     # Random sampling to reduce data size while preserving distribution
-                indices = np.random.choice(len(values), size=10000, replace=False)
+                indices = np.random.choice(len(values), size=sample_size, replace=False)
                 values = values[indices]
                 
             # Create a dataframe entry for each value
