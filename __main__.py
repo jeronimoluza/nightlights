@@ -11,13 +11,13 @@ if __name__ == "__main__":
     final_output_dir = "./data/output"
 
     # Define search parameters
-    short_name = "VNP46A2"
-    version = "2"
-    start_date = "2019-03-01"
-    end_date = "2019-03-15"
+    short_name = "VNP46A3"
+    version = "1"
+    start_date = "2023-03-01"
+    end_date = "2023-12-15"
 
     region = download.find_region(
-        query="Caracas, Venezuela",
+        query="Lebanon",
     )
     region_crs = region.crs.to_epsg()
     region = region.geometry.values[0]
@@ -31,8 +31,8 @@ if __name__ == "__main__":
         region=region,
     )
 
-    # variable_name = "AllAngle_Composite_Snow_Free"
-    variable_name = "DNB_BRDF-Corrected_NTL"
+    variable_name = "AllAngle_Composite_Snow_Free"
+    # variable_name = "DNB_BRDF-Corrected_NTL"
 
     # process.process_files(files, variable_name=variable_name, output_dir=extraction_dir, bounding_box=region.bounds)
 
@@ -46,21 +46,19 @@ if __name__ == "__main__":
     #     region=region,
     # )
 
-    gdf = process.polygonize(
-        files, variable_name=variable_name, region=region, region_crs=region_crs
-    )
-    print(gdf.head())
-    print(gdf.tail())
-    gdf[gdf.date.isin(["2019-03-01", "2019-03-02"])].to_csv("date.csv")
+    # gdf = process.polygonize(
+    #     files, variable_name=variable_name, region=region, region_crs=region_crs
+    # )
     plotting.create_timelapse_gif(
         files,
         variable_name=variable_name,
-        title="Venezuela",
+        title="Lebanon",
         output_dir=plot_dir,
         region=region,
         fps=2.0,
         plot_series=True,
         use_confidence_interval=True,
         confidence_level=0.95,
+        cut_off=0.5,
     )
 

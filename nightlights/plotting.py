@@ -246,6 +246,7 @@ def create_timelapse_gif(
     plot_series: bool = False,
     use_confidence_interval: bool = False,
     confidence_level: float = 0.95,
+    cut_off: float = 0,
 ) -> None:
     """Create a timelapse GIF from multiple dates of data, using only region-filtered data.
 
@@ -476,7 +477,9 @@ def create_frame(
 
     # Add title to the map
     if plot_series and all_dates and all_data:
-        ax.set_title(f"{title}\ndate: {date}\nVariable: {variable_name}")
+        ax.set_title(f"{title}\nDate: {date}\nVariable: {variable_name}")
+        if cut_off > 0:
+            ax.set_title(f"{ax.get_title()}\nCut-off: {cut_off}")
 
         # Create line plot for mean and median values across all dates
         date_objects = []
@@ -511,6 +514,7 @@ def create_frame(
                 all_data,
                 date,
                 confidence_level,
+                cut_off=cut_off,
             )
         elif date_objects and mean_values and median_values:
             # Plot mean values in red
@@ -542,6 +546,8 @@ def create_frame(
             # Add legend, title and labels
             ax_box.legend(loc="best")
             ax_box.set_title("Mean and Median of Non-Zero Values Over Time")
+            if cut_off > 0:
+                ax_box.set_title(f"{ax_box.get_title()}\nCut-off: {cut_off}")
             ax_box.set_ylabel(f"Radiance (nW·cm$^{-2}$·sr$^{-1}$)")
             ax_box.set_xlabel("Date")
 
@@ -664,6 +670,8 @@ def plot_confidence_interval(
     # Add legend, title and labels
     ax.legend(loc='best')
     ax.set_title(f'Nightlight Values with {confidence_level*100:.0f}% Confidence Interval')
+    if cut_off > 0:
+        ax.set_title(f"{ax.get_title()}\nCut-off: {cut_off}")
     ax.set_ylabel(f'Radiance (nW·cm$^{{-2}}$·sr$^{{-1}}$)')
     ax.set_xlabel('Date')
     
