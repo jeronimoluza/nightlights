@@ -4,6 +4,7 @@ import nightlights.utils as utils
 import geopandas as gpd
 import osmnx as ox
 
+AVAILABLE_SHORT_NAMES = ["VNP46A1", "VNP46A2", "VNP46A3", "VNP46A4"]
 
 def earthaccess_login():
     """
@@ -28,10 +29,10 @@ def filter_granules(granules: list, start_date: str, end_date: str):
 def download_earthaccess(
     download_dir: str,
     short_name: str,
-    version: str,
     start_date: str,
     end_date: str,
     region,
+    version: str = "1",
     count: int = -1,
 ) -> list:
     """
@@ -43,7 +44,7 @@ def download_earthaccess(
     Parameters:
     - download_dir (str): The directory where the downloaded files will be saved.
     - short_name (str): The short name of the dataset (e.g., 'MOD13Q1').
-    - version (str): The version of the dataset (e.g., '061').
+    - version (str): The version of the dataset (e.g., '061'). Default is '1'.
     - start_date (str): The start date of the search period in 'YYYY-MM-DD' format.
     - end_date (str): The end date of the search period in 'YYYY-MM-DD' format.
     - region (Polygon, MultiPolygon, GeoDataFrame, or WKT string): The region of interest.
@@ -52,6 +53,15 @@ def download_earthaccess(
     Returns:
     - list: A list of downloaded file paths.
     """
+
+    if short_name not in AVAILABLE_SHORT_NAMES:
+        raise ValueError(f"short_name must be one of {AVAILABLE_SHORT_NAMES}")
+
+    # VNP46A2 is version 2, all others are version 1 FOR NOW
+    if short_name == "VNP46A2":
+        version = "2"
+    else:
+        version = "1"
 
     auth = earthaccess_login()
 
