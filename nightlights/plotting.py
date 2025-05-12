@@ -620,18 +620,16 @@ def plot_inset_chart(
     df['date'] = pd.to_datetime(df['date'])
     
     # Create the seaborn lineplot with confidence interval
-    sns.lineplot(
+    sns.pointplot(
         data=df,
         x='date',
         y='value',
+        ax=ax,
         errorbar=("ci", confidence_level*100),
-        # estimator='mean',
-        color='blue',
-        ax=ax
     )
     
     # Add vertical line for current date
-    current_date_obj = pd.to_datetime(current_date)
+    current_date_obj = pd.to_datetime(current_date).strftime("%Y-%m-%d")
     ax.axvline(
         x=current_date_obj,
         color='red',

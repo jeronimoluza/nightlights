@@ -57,7 +57,7 @@ def do_main():
         use_confidence_interval=True,
         confidence_level=0.95,
         sample_size=1000000,
-        cut_off=0.5,
+        cut_off=0,
     )
 
 
