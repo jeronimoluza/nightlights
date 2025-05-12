@@ -12,11 +12,11 @@ def do_main():
     final_output_dir = "./data/output"
 
     # Define search parameters
-    short_name = "VNP46A4"
-    start_date = "2012-01-01"
-    end_date = "2024-12-15"
+    short_name = "VNP46A2"
+    start_date = "2025-04-20"
+    end_date = "2025-05-05"
 
-    regions = ["Lebanon"]
+    regions = ["Madrid, Spain"]
     region_gdf = gpd.GeoDataFrame(
         pd.concat(
             [download.find_region(query=region) for region in regions], ignore_index=True
@@ -34,13 +34,13 @@ def do_main():
         region=region,
     )
 
-    variable_name = "AllAngle_Composite_Snow_Free"
-    # variable_name = "DNB_BRDF-Corrected_NTL"
+    # variable_name = "AllAngle_Composite_Snow_Free"
+    variable_name = "DNB_BRDF-Corrected_NTL"
 
     plotting.plot_nightlights(
         files,
         variable_name=variable_name,
-        date="2022-01-01",
+        date="2025-04-20",
         output_dir=plot_dir,
         region=region,
     )
@@ -48,7 +48,7 @@ def do_main():
     plotting.create_timelapse_gif(
         files,
         variable_name=variable_name,
-        title="Lebanon Through the Years",
+        title="Spain Blackout 2025",
         output_dir=plot_dir,
         region=region,
         region_crs=region_crs,
@@ -58,6 +58,7 @@ def do_main():
         confidence_level=0.95,
         sample_size=1000000,
         cut_off=0,
+        events=("Spain Blackout", "2025-04-29"),
     )
 
 

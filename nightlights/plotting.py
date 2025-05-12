@@ -249,6 +249,7 @@ def create_timelapse_gif(
     confidence_level: float = 0.95,
     sample_size: int = None,
     cut_off: float = 0,
+    events = None,  
 ) -> None:
     """Create a timelapse GIF from multiple dates of data, using only region-filtered data.
 
@@ -265,6 +266,8 @@ def create_timelapse_gif(
         confidence_level (float): Confidence level for the interval (0-1), default is 0.95 (95%)
         sample_size (int): Number of values to sample for each date
         cut_off (float): Minimum value to include in the series plot
+        events: Optional event(s) to mark on the chart. Can be either a single tuple 
+               ("event_name", date) or a list of tuples [("event_1", date1), ("event_2", date2)]
     """
     # Create output directory if it doesn't exist
     os.makedirs(output_dir, exist_ok=True)
@@ -342,6 +345,7 @@ def create_timelapse_gif(
                 confidence_level=confidence_level,
                 sample_size=sample_size,
                 cut_off=cut_off,
+                events=events,
             )
             frame_paths.append(frame_path)
 
@@ -374,6 +378,7 @@ def create_frame(
     confidence_level: float = 0.95,
     sample_size: int = None,
     cut_off: float = 0,
+    events = None,
 ) -> str:
     """Create a single frame for the timelapse.
 
@@ -393,7 +398,8 @@ def create_frame(
         confidence_level (float): Confidence level for the interval (0-1), default is 0.95 (95%)
         sample_size (int): Number of values to sample for each date
         cut_off (float): Minimum value to include in the series plot
-
+        events: Optional event(s) to mark on the chart. Can be either a single tuple 
+               ("event_name", date) or a list of tuples [("event_1", date1), ("event_2", date2)]
     Returns:
         str: Path to the saved frame image
     """
@@ -505,6 +511,7 @@ def create_frame(
                 confidence_level,
                 sample_size=sample_size,
                 cut_off=cut_off,
+                events=events,
             )
         elif date_objects:
             # Add vertical line for current date
@@ -557,6 +564,7 @@ def plot_inset_chart(
     fixed_y_limits: bool = True,
     sample_size: int = None,
     cut_off: float = 0,
+    events = None,
 ) -> None:
     """Create a seaborn lineplot with confidence intervals for each date.
     
@@ -568,16 +576,16 @@ def plot_inset_chart(
         confidence_level (float): Confidence level for the interval (0-1)
         fixed_y_limits (bool): Whether to use fixed y-axis limits across all frames
         sample_size (int): Number of values to sample for each date
-        """
+        cut_off (float): Minimum value to include in the analysis
+        events: Optional event(s) to mark on the chart. Can be either a single tuple 
+               ("event_name", date) or a list of tuples [("event_1", date1), ("event_2", date2)]
+    """
     # Prepare data for seaborn lineplot
     data_for_plot = []
     all_values = []
     
     # Process data for each date
     for date_str in all_dates:
-        if date_str not in all_data or all_data[date_str] is None:
-            print(f"Missing or invalid data for date: {date_str}")
-            continue
             
         # Get non-NaN values for this date
         try:
@@ -629,7 +637,11 @@ def plot_inset_chart(
         errorbar=("ci", confidence_level*100),
         native_scale=True
     )
+    dates = [pd.to_datetime(d) for d in all_dates]
+    min_date = min(dates)
+    max_date = max(dates)
     
+    ax.set_xlim(min_date - pd.Timedelta(days=1), max_date + pd.Timedelta(days=1))
     # Add vertical line for current date
     current_date_obj = pd.to_datetime(current_date)
     ax.axvline(
@@ -639,6 +651,26 @@ def plot_inset_chart(
         linewidth=1.5,
         label='Current Date'
     )
+
+    # Add event markers if provided
+    if events is not None:
+        # Convert single event to list for uniform processing
+        event_list = [events] if isinstance(events, tuple) else events
+        
+        for event_name, event_date in event_list:
+            # Convert date to datetime if it's a string
+            if isinstance(event_date, str):
+                event_date = pd.to_datetime(event_date)
+                
+            # Add vertical line for the event
+            ax.axvline(
+                x=event_date,
+                color='red',
+                linestyle='-',
+                linewidth=1.5,
+                alpha=0.7,
+                label=event_name,
+            )
     
     # Calculate and set fixed y-axis limits if requested
     if fixed_y_limits and all_values:
@@ -670,6 +702,8 @@ def plot_inset_chart(
     
     # Add grid for better readability
     ax.grid(True, linestyle='--', alpha=0.7)
+    
+
 
 
 def create_gif(
