@@ -497,7 +497,7 @@ def create_frame(
         # Create line plot if we have data
         if use_confidence_interval:
             # Use the seaborn confidence interval plot
-            plot_confidence_interval(
+            plot_inset_chart(
                 ax_box,
                 all_dates,
                 all_data,
@@ -548,7 +548,7 @@ def create_frame(
     return frame_path
 
 
-def plot_confidence_interval(
+def plot_inset_chart(
     ax, 
     all_dates: List[str], 
     all_data: Dict[str, xr.DataArray], 
