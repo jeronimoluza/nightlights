@@ -67,8 +67,11 @@ def load_data_from_h5(
 
             # Apply region clipping if provided
             if region is not None:
+                # Check if region is a valid geometry object
+                if not isinstance(region, (Polygon, MultiPolygon)):
+                    raise TypeError(f"Region must be a Polygon or MultiPolygon, got {type(region)}")
                 # Use rio.clip to clip the data to the region
-                data_var = data_var.rio.clip([region], region_crs, drop=True)
+                data_var = data_var.rio.clip([region], crs=f"EPSG:{region_crs}", drop=True)
                 # Use clipped coordinates for calculations
                 x_values = data_var.x.values
                 y_values = data_var.y.values
@@ -731,13 +734,14 @@ def polygonize(
 
 
 def process_files_for_date(
-    files: List[str], variable_name: str, region=None, region_crs: int = 4326
+    files: List[str], variable_name: str, log_scale: bool = True, region=None, region_crs: int = 4326
 ) -> xr.DataArray:
     """Process files for a specific date and return combined data.
 
     Args:
         files (list): List of h5 file paths for a specific date
         variable_name (str): Name of the variable to extract
+        log_scale (bool): Whether to apply log scaling
         region (shapely.geometry.Polygon, optional): Region to filter by
         region_crs (int): Coordinate reference system of the region
 
@@ -752,7 +756,7 @@ def process_files_for_date(
             data, lons, lats = prepare_data(
                 file,
                 variable_name,
-                log_scale=True,
+                log_scale=log_scale,
                 region=region,
                 region_crs=region_crs,
             )
@@ -769,6 +773,8 @@ def process_files_for_date(
                 combined_data = xr.concat([combined_data, da], dim="tile")
                 combined_data = combined_data.max(dim="tile", skipna=True)
         except Exception as e:
+            import traceback
             print(f"Error processing file {file}: {e}")
+            traceback.print_exc()
 
     return combined_data

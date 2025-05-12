@@ -175,7 +175,7 @@ def plot_nightlights(
     if date in files_by_date:
         # Process files for this date
         combined_data = process_files_for_date(
-            files_by_date[date], variable_name, region, region_crs
+            files_by_date[date], variable_name, log_scale=log_scale, region=region, region_crs=region_crs
         )
     else:
         print(f"No files found for date: {date}")
@@ -209,7 +209,7 @@ def plot_nightlights(
     )
 
     # Add a colorbar
-    add_colorbar(ax, mesh, log_scale=True)
+    add_colorbar(ax, mesh, log_scale=log_scale)
 
     # Set the extent to the data bounds
     set_map_extent(ax, (lons, lats))
@@ -295,7 +295,7 @@ def create_timelapse_gif(
         ):
             # Process files for this date
             combined_data = process_files_for_date(
-                date_files, variable_name, region, region_crs
+                files=date_files, variable_name=variable_name, log_scale=True, region=region, region_crs=region_crs
             )
             if combined_data is None:
                 print(f"Warning: No valid data for date {date}, skipping")
@@ -304,16 +304,6 @@ def create_timelapse_gif(
             # We've already applied region clipping in process_files_for_date
             # Just use the data as is
             filtered_data = combined_data
-
-            # Make sure any remaining fill values are properly masked
-            if not np.isnan(filtered_data.min()):
-                # Check for suspiciously high values that might be fill values
-                # This is a fallback in case the fill value wasn't properly handled earlier
-                suspicious_values = (
-                    filtered_data > filtered_data.quantile(0.99) * 10
-                )
-                if suspicious_values.any():
-                    filtered_data = filtered_data.where(~suspicious_values)
 
             date_data_dict[date] = filtered_data
 
@@ -487,17 +477,14 @@ def create_frame(
         if cut_off > 0:
             ax.set_title(f"{ax.get_title()}\nCut-off: {cut_off}")
 
-        # Create line plot for mean and median values across all dates
         date_objects = []
-        mean_values = []
-        median_values = []
 
         # Get data values for each date
         for d in all_dates:
             # Get non-NaN values for this date
             values = all_data[d].values.flatten()
             values = values[~np.isnan(values)]
-            values = values[values > cut_off]
+            values = values[values >= cut_off]
             if len(values) > 0:
                 # Apply log transformation to match the map data
                 # Add 1 to avoid log(0) just like in prepare_data function
@@ -506,10 +493,6 @@ def create_frame(
                 # Convert date string to datetime object for proper plotting
                 date_obj = datetime.strptime(d, "%Y-%m-%d")
                 date_objects.append(date_obj)
-
-                # Calculate mean and median
-                mean_values.append(np.mean(values))
-                median_values.append(np.median(values))
 
         # Create line plot if we have data
         if use_confidence_interval:
@@ -523,17 +506,7 @@ def create_frame(
                 sample_size=sample_size,
                 cut_off=cut_off,
             )
-        elif date_objects and mean_values and median_values:
-            # Plot mean values in red
-            ax_box.plot(
-                date_objects, mean_values, "r-", linewidth=2, label="Mean"
-            )
-
-            # Plot median values in blue
-            ax_box.plot(
-                date_objects, median_values, "b-", linewidth=2, label="Median"
-            )
-
+        elif date_objects:
             # Add vertical line for current date
             current_date_obj = datetime.strptime(date, "%Y-%m-%d")
             ax_box.axvline(
@@ -610,9 +583,10 @@ def plot_confidence_interval(
         try:
             values = all_data[date_str].values.flatten()
             values = values[~np.isnan(values)]
-            
+            values = np.exp(values) - 1
+ 
             # Apply cut-off filter (use greater than or equal to)
-            # values = values[values >= cut_off]
+            values = values[values >= cut_off]
             
             if len(values) > 0:
                 # Store all values for y-axis limit calculation
@@ -651,7 +625,7 @@ def plot_confidence_interval(
         x='date',
         y='value',
         errorbar=("ci", confidence_level*100),
-        estimator='mean',
+        # estimator='mean',
         color='blue',
         ax=ax
     )
