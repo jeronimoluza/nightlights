@@ -354,7 +354,6 @@ def create_timelapse_gif(
                 cut_off=cut_off,
                 events=events,
             )
-            print(sm.get_clim())
             frame_paths.append(frame_path)
 
         if not frame_paths:
