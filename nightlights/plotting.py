@@ -1,6 +1,8 @@
 """Module for visualizing nightlights data."""
 
 import matplotlib.pyplot as plt
+from matplotlib.colors import LogNorm, Normalize
+from matplotlib.cm import ScalarMappable
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 import numpy as np
@@ -13,6 +15,8 @@ from datetime import datetime
 from typing import Dict, List, Tuple, Union, Optional
 import seaborn as sns
 import pandas as pd
+
+np.random.seed(19680801)
 
 # Constants
 DEFAULT_CMAP = "cividis"
@@ -116,20 +120,21 @@ def set_map_extent(
 
 
 def add_colorbar(
-    ax: plt.Axes, mesh, log_scale: bool = True
+    ax: plt.Axes, sm: ScalarMappable, log_scale: bool = True
 ):
     """
     Add a colorbar to a plot.
 
     Args:
         ax (plt.Axes): Matplotlib axis
-        mesh: Mesh object from pcolormesh
+        sm (ScalarMappable): ScalarMappable object for color scaling
         log_scale (bool): Whether the data is log-scaled
 
     Returns:
         colorbar: The created colorbar
     """
-    cbar = plt.colorbar(mesh, ax=ax, pad=0.01, shrink=0.8)
+    fig = ax.get_figure()
+    cbar = fig.colorbar(sm, ax=ax, pad=0.01, shrink=0.8)
     if log_scale:
         cbar.set_label(f"Log radiance (nW·cm$^{-2}$·sr$^{-1}$)")
     else:
@@ -144,8 +149,6 @@ def plot_nightlights(
     output_dir: str = None,
     log_scale: bool = True,
     cmap: str = DEFAULT_CMAP,
-    vmin: float = None,
-    vmax: float = None,
     region=None,
     region_crs: int = 4326,
 ) -> Tuple[plt.Figure, plt.Axes]:
@@ -197,19 +200,22 @@ def plot_nightlights(
     # Create a mesh grid for the longitudes and latitudes
     lon_mesh, lat_mesh = np.meshgrid(lons, lats)
 
+    # Create a ScalarMappable for color scaling
+    norm = Normalize(vmin=data.min(), vmax=data.max())
+    sm = ScalarMappable(cmap=cmap, norm=norm)
+
     # Plot the data using pcolormesh
-    mesh = ax.pcolormesh(
+    ax.pcolormesh(
         lon_mesh,
         lat_mesh,
         data,
-        cmap=cmap,
-        vmin=vmin,
-        vmax=vmax,
+        cmap=sm.cmap,
+        norm=sm.norm,
         transform=ccrs.PlateCarree(),
     )
 
     # Add a colorbar
-    add_colorbar(ax, mesh, log_scale=log_scale)
+    add_colorbar(ax, sm, log_scale=log_scale)
 
     # Set the extent to the data bounds
     set_map_extent(ax, (lons, lats))
@@ -244,6 +250,7 @@ def create_timelapse_gif(
     region=None,
     region_crs: int = 4326,
     fps: float = 5.0,
+    cmap: str = DEFAULT_CMAP,
     plot_series: bool = False,
     use_confidence_interval: bool = False,
     confidence_level: float = 0.95,
@@ -321,7 +328,8 @@ def create_timelapse_gif(
             return
 
         # Prepare to create frames for each date with consistent color scaling
-                
+        norm = Normalize(vmin=global_min, vmax=global_max)
+        sm = ScalarMappable(cmap=cmap, norm=norm)
         
         # Create a frame for each date with consistent color scaling
         frame_paths = []
@@ -336,8 +344,7 @@ def create_timelapse_gif(
                 title,
                 timelapse_dir,
                 region,
-                global_min,
-                global_max,
+                sm,
                 plot_series=plot_series,
                 all_dates=sorted_dates,
                 all_data=date_data_dict,
@@ -347,6 +354,7 @@ def create_timelapse_gif(
                 cut_off=cut_off,
                 events=events,
             )
+            print(sm.get_clim())
             frame_paths.append(frame_path)
 
         if not frame_paths:
@@ -369,8 +377,8 @@ def create_frame(
     title: str,
     output_dir: str,
     region=None,
-    vmin: float = None,
-    vmax: float = None,
+    sm: ScalarMappable = None,
+    cmap: str = DEFAULT_CMAP,
     plot_series: bool = False,
     all_dates: List[str] = None,
     all_data: Dict[str, xr.DataArray] = None,
@@ -389,8 +397,7 @@ def create_frame(
         title (str): Title to display at the top of the plot
         output_dir (str): Directory to save the frame
         region (shapely.geometry.Polygon, optional): Region used for filtering
-        vmin (float): Minimum value for color scaling
-        vmax (float): Maximum value for color scaling
+        sm (ScalarMappable): ScalarMappable object for color scaling
         plot_series (bool): If True, show lineplots of data values for all dates below the map
         all_dates (List[str]): List of all dates in the timelapse (required if plot_series is True)
         all_data (Dict[str, xr.DataArray]): Dictionary of all data by date (required if plot_series is True)
@@ -458,18 +465,17 @@ def create_frame(
         fig, ax = setup_map_figure()
 
     # Plot the data with consistent color scaling
-    mesh = ax.pcolormesh(
+    ax.pcolormesh(
         data.x,
         data.y,
         data,
-        cmap=DEFAULT_CMAP,
+        cmap=cmap,
         transform=ccrs.PlateCarree(),
-        vmin=vmin,
-        vmax=vmax,
+        norm=sm.norm,
     )
 
     # Add a colorbar
-    add_colorbar(ax, mesh, log_scale=True)
+    add_colorbar(ax, sm, log_scale=True)
 
     # Set the extent based on region or data bounds
     if region is not None:
