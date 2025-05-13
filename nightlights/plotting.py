@@ -251,7 +251,7 @@ def create_timelapse_gif(
     region=None,
     region_crs: int = 4326,
     fps: float = 5.0,
-    cmap: str = DEFAULT_CMAP,
+    bins: int = 15,
     plot_series: bool = False,
     use_confidence_interval: bool = False,
     confidence_level: float = 0.95,
@@ -269,6 +269,7 @@ def create_timelapse_gif(
         region (shapely.geometry.Polygon): Region to filter by (required)
         region_crs (int): Coordinate reference system of the region
         fps (float): Frames per second for the GIF
+        bins (int): Number of bins for color scaling
         plot_series (bool): If True, show lineplots of data values for all dates below the map
         use_confidence_interval (bool): If True, use confidence interval plot instead of mean/median
         confidence_level (float): Confidence level for the interval (0-1), default is 0.95 (95%)
@@ -329,7 +330,7 @@ def create_timelapse_gif(
             return
 
         # Prepare to create frames for each date with consistent color scaling
-        levels = MaxNLocator(nbins=15).tick_values(global_min, global_max)
+        levels = MaxNLocator(nbins=bins).tick_values(global_min, global_max)
         norm = BoundaryNorm(levels, ncolors=plt.colormaps[DEFAULT_CMAP].N, clip=True)
         
         # Create a frame for each date with consistent color scaling
