@@ -12,11 +12,11 @@ def do_main():
     final_output_dir = "./data/output"
 
     # Define search parameters
-    short_name = "VNP46A3"
-    start_date = "2020-10-01"
-    end_date = "2021-05-01"
+    short_name = "VNP46A2"
+    start_date = "2019-03-01"
+    end_date = "2019-03-17"
 
-    regions = ["Kyiv, Ukraine"]
+    regions = ["Venezuela"]
     region_gdf = gpd.GeoDataFrame(
         pd.concat(
             [download.find_region(query=region) for region in regions], ignore_index=True
@@ -34,8 +34,8 @@ def do_main():
         region=region,
     )
 
-    variable_name = "AllAngle_Composite_Snow_Free"
-    # variable_name = "DNB_BRDF-Corrected_NTL"
+    # variable_name = "AllAngle_Composite_Snow_Free"
+    variable_name = "DNB_BRDF-Corrected_NTL"
 
     # plotting.plot_nightlights(
     #     files,
@@ -48,15 +48,15 @@ def do_main():
     plotting.create_timelapse_gif(
         files,
         variable_name=variable_name,
-        title="Russia invasion of Ukraine 2021",
+        title="Venezuela Blackout",
         output_dir=plot_dir,
         region=region,
         region_crs=region_crs,
         fps=2.0,
         plot_series=True,
         sample_size=1000000,
-        cut_off=0.5,
-        events=("Russia invasion of Ukraine", "2021-02-24"),
+        cut_off=10,
+        events=("Venezuela Blackout", "2019-03-07"),
     )
 
 

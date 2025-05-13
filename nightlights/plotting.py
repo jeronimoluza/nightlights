@@ -252,8 +252,6 @@ def create_timelapse_gif(
     fps: float = 5.0,
     bins: int = 15,
     plot_series: bool = False,
-    use_confidence_interval: bool = False,
-    confidence_level: float = 0.95,
     sample_size: int = None,
     cut_off: float = 0,
     events = None,  
@@ -270,8 +268,6 @@ def create_timelapse_gif(
         fps (float): Frames per second for the GIF
         bins (int): Number of bins for color scaling
         plot_series (bool): If True, show lineplots of data values for all dates below the map
-        use_confidence_interval (bool): If True, use confidence interval plot instead of mean/median
-        confidence_level (float): Confidence level for the interval (0-1), default is 0.95 (95%)
         sample_size (int): Number of values to sample for each date
         cut_off (float): Minimum value to include in the series plot
         events: Optional event(s) to mark on the chart. Can be either a single tuple 
@@ -409,48 +405,44 @@ def create_series_plot(
             date_objects.append(date_obj)
 
     # Create line plot if we have data
-    if plot_series:
-        # Use the seaborn confidence interval plot
-        plot_inset_chart(
-            ax_box,
-            all_dates,
-            all_data,
-            date,
-            confidence_level,
-            sample_size=sample_size,
-            cut_off=cut_off,
-            events=events,
-        )
-    elif date_objects:
-        # Add vertical line for current date
-        current_date_obj = datetime.strptime(date, "%Y-%m-%d")
-        ax_box.axvline(
-            x=current_date_obj,
-            color="gray",
-            linestyle="--",
-            linewidth=1.5,
-            label="Current Date",
-        )
+    plot_inset_chart(
+        ax_box,
+        all_dates,
+        all_data,
+        date,
+        sample_size=sample_size,
+        cut_off=cut_off,
+        events=events,
+    )
+    # Add vertical line for current date
+    current_date_obj = datetime.strptime(date, "%Y-%m-%d")
+    ax_box.axvline(
+        x=current_date_obj,
+        color="gray",
+        linestyle="--",
+        linewidth=1.5,
+        label="Current Date",
+    )
 
-        # Format x-axis to show dates nicely
-        ax_box.xaxis.set_major_formatter(
-            plt.matplotlib.dates.DateFormatter("%Y-%m-%d")
-        )
-        plt.setp(ax_box.get_xticklabels(), rotation=45, ha="right")
+    # Format x-axis to show dates nicely
+    ax_box.xaxis.set_major_formatter(
+        plt.matplotlib.dates.DateFormatter("%Y-%m-%d")
+    )
+    plt.setp(ax_box.get_xticklabels(), rotation=45, ha="right")
 
-        # Add legend, title and labels
-        ax_box.legend(loc="best")
-        ax_box.set_title("Mean and Median of Non-Zero Values Over Time")
-        if cut_off > 0:
-            ax_box.set_title(f"{ax_box.get_title()}\nCut-off: {cut_off}")
-        ax_box.set_ylabel(f"Radiance (nW·cm$^{-2}$·sr$^{-1}$)")
-        ax_box.set_xlabel("Date")
+    # Add legend, title and labels
+    ax_box.legend(loc="best")
+    ax_box.set_title("Quartiles of Values Over Time")
+    if cut_off > 0:
+        ax_box.set_title(f"{ax_box.get_title()}\nCut-off: {cut_off}")
+    ax_box.set_ylabel(f"Radiance (nW·cm$^{-2}$·sr$^{-1}$)")
+    ax_box.set_xlabel("Date")
 
-        # Add grid for better readability
-        ax_box.grid(True, linestyle="--", alpha=0.7)
+    # Add grid for better readability
+    ax_box.grid(True, linestyle="--", alpha=0.7)
 
-        # Adjust layout
-        plt.tight_layout()
+    # Adjust layout
+    plt.tight_layout()
 
 
 def create_frame(
@@ -596,7 +588,6 @@ def plot_inset_chart(
     ax, 
     all_dates: List[str], 
     all_data: Dict[str, xr.DataArray], 
-    current_date: str,
     fixed_y_limits: bool = True,
     sample_size: int = None,
     cut_off: float = 0,
@@ -608,7 +599,6 @@ def plot_inset_chart(
         ax (matplotlib.axes.Axes): The axis to plot on
         all_dates (List[str]): List of all dates in the timelapse
         all_data (Dict[str, xr.DataArray]): Dictionary of all data by date
-        current_date (str): The current date being displayed in the main plot
         fixed_y_limits (bool): Whether to use fixed y-axis limits across all frames
         sample_size (int): Number of values to sample for each date
         cut_off (float): Minimum value to include in the analysis
@@ -686,15 +676,6 @@ def plot_inset_chart(
     min_date = min(dates)
     max_date = max(dates)
     ax.set_xlim(min_date - pd.Timedelta(days=1), max_date + pd.Timedelta(days=1))
-    # Add vertical line for current date
-    current_date_obj = pd.to_datetime(current_date)
-    ax.axvline(
-        x=current_date_obj,
-        color='gray',
-        linestyle='--',
-        linewidth=1.5,
-        label='Current Date'
-    )
 
     # Add event markers if provided
     if events is not None:
@@ -717,18 +698,18 @@ def plot_inset_chart(
             )
     
     # Calculate and set fixed y-axis limits if requested
-    if fixed_y_limits and all_values:
-        # Calculate percentiles to exclude extreme outliers
-        y_min = np.mean(all_values) - np.std(all_values)
-        y_max = np.mean(all_values) + np.std(all_values)
+    # if fixed_y_limits and all_values:
+    #     # Calculate percentiles to exclude extreme outliers
+    #     y_min = np.mean(all_values) - 5*np.std(all_values)
+    #     y_max = np.mean(all_values) + 5*np.std(all_values)
         
-        # Add some padding
-        y_range = y_max - y_min
-        y_min = max(0, y_min - 0.05 * y_range)  # Ensure it's not negative
-        y_max = y_max + 0.05 * y_range
+    #     # Add some padding
+    #     y_range = y_max - y_min
+    #     y_min = max(0, y_min - 0.05 * y_range)  # Ensure it's not negative
+    #     y_max = y_max + 0.05 * y_range
         
-        # Set the limits
-        ax.set_ylim(y_min, y_max)
+    #     # Set the limits
+    #     ax.set_ylim(y_min, y_max)
     
     # Format x-axis to show dates nicely
     ax.xaxis.set_major_formatter(

@@ -99,10 +99,13 @@ def load_data_from_h5(
             long_pixel_length = (lon_max - lon_min) / (longitude_pixels - 1)
             lat_pixel_length = (lat_max - lat_min) / (latitude_pixels - 1)
 
+            scale_factor = data_obj.attrs.get(f"{var_path}_scale_factor", 1.0)
+            if scale_factor != 0.1:
+                scale_factor = 0.1
             # Create common metadata dictionary
             metadata = {
                 "fill_value": fill_value,
-                "scale_factor": data_obj.attrs.get(f"{var_path}_scale_factor", 1.0),
+                "scale_factor": scale_factor,
                 "offset": data_obj.attrs.get(f"{var_path}_offset", 0.0),
                 "product": data_obj.attrs.get("ShortName", ""),
                 "date": data_obj.attrs.get("RangeBeginningdate", ""),
@@ -773,8 +776,6 @@ def process_files_for_date(
                 combined_data = xr.concat([combined_data, da], dim="tile")
                 combined_data = combined_data.max(dim="tile", skipna=True)
         except Exception as e:
-            import traceback
             print(f"Error processing file {file}: {e}")
-            traceback.print_exc()
 
     return combined_data
