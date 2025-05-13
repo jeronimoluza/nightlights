@@ -1,7 +1,6 @@
 """Module for visualizing nightlights data."""
 
 import matplotlib.pyplot as plt
-from matplotlib.colors import Normalize
 from matplotlib.colors import BoundaryNorm
 from matplotlib.ticker import MaxNLocator
 import cartopy.crs as ccrs
@@ -378,7 +377,7 @@ def create_frame(
     title: str,
     output_dir: str,
     region=None,
-    norm: Normalize = None,
+    norm: BoundaryNorm = None,
     cmap: str = DEFAULT_CMAP,
     plot_series: bool = False,
     all_dates: List[str] = None,
@@ -398,7 +397,7 @@ def create_frame(
         title (str): Title to display at the top of the plot
         output_dir (str): Directory to save the frame
         region (shapely.geometry.Polygon, optional): Region used for filtering
-        norm (Normalize): Normalize object for color scaling
+        norm (BoundaryNorm): BoundaryNorm object for color scaling
         cmap (str): Colormap to use for the plot
         plot_series (bool): If True, show lineplots of data values for all dates below the map
         all_dates (List[str]): List of all dates in the timelapse (required if plot_series is True)
