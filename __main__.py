@@ -53,11 +53,9 @@ def do_main():
         region=region,
         region_crs=region_crs,
         fps=2.0,
-        # plot_series=True,
-        # use_confidence_interval=True,
-        # confidence_level=0.95,
-        # sample_size=1000000,
-        # cut_off=0,
+        plot_series=True,
+        sample_size=1000000,
+        cut_off=0.5,
         events=("Russia invasion of Ukraine", "2021-02-24"),
     )
 

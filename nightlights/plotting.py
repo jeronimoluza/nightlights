@@ -349,8 +349,6 @@ def create_timelapse_gif(
                 plot_series=plot_series,
                 all_dates=sorted_dates,
                 all_data=date_data_dict,
-                use_confidence_interval=use_confidence_interval,
-                confidence_level=confidence_level,
                 sample_size=sample_size,
                 cut_off=cut_off,
                 events=events,
@@ -370,6 +368,91 @@ def create_timelapse_gif(
 
 
 
+def create_series_plot(
+    fig: plt.Figure,
+    ax_box: plt.Axes,
+    date: str,
+    all_dates: List[str],
+    all_data: Dict[str, xr.DataArray],
+    sample_size: int = None,
+    cut_off: float = 0,
+    events = None,
+) -> None:
+    """Create a series plot below the main map.
+
+    Args:
+        fig (plt.Figure): The figure object to add the series plot to
+        ax_box (plt.Axes): The axis to plot the series on
+        date (str): The current date being displayed in the main plot
+        all_dates (List[str]): List of all dates in the timelapse
+        all_data (Dict[str, xr.DataArray]): Dictionary of all data by date
+        sample_size (int): Number of values to sample for each date
+        cut_off (float): Minimum value to include in the series plot
+        events: Optional event(s) to mark on the chart. Can be either a single tuple 
+               ("event_name", date) or a list of tuples [("event_1", date1), ("event_2", date2)]
+    """
+    date_objects = []
+
+    # Get data values for each date
+    for d in all_dates:
+        # Get non-NaN values for this date
+        values = all_data[d].values.flatten()
+        values = values[~np.isnan(values)]
+        values = values[values >= cut_off]
+        if len(values) > 0:
+            # Apply log transformation to match the map data
+            # Add 1 to avoid log(0) just like in prepare_data function
+            # values = np.log(values + 1)
+
+            # Convert date string to datetime object for proper plotting
+            date_obj = datetime.strptime(d, "%Y-%m-%d")
+            date_objects.append(date_obj)
+
+    # Create line plot if we have data
+    if plot_series:
+        # Use the seaborn confidence interval plot
+        plot_inset_chart(
+            ax_box,
+            all_dates,
+            all_data,
+            date,
+            confidence_level,
+            sample_size=sample_size,
+            cut_off=cut_off,
+            events=events,
+        )
+    elif date_objects:
+        # Add vertical line for current date
+        current_date_obj = datetime.strptime(date, "%Y-%m-%d")
+        ax_box.axvline(
+            x=current_date_obj,
+            color="gray",
+            linestyle="--",
+            linewidth=1.5,
+            label="Current Date",
+        )
+
+        # Format x-axis to show dates nicely
+        ax_box.xaxis.set_major_formatter(
+            plt.matplotlib.dates.DateFormatter("%Y-%m-%d")
+        )
+        plt.setp(ax_box.get_xticklabels(), rotation=45, ha="right")
+
+        # Add legend, title and labels
+        ax_box.legend(loc="best")
+        ax_box.set_title("Mean and Median of Non-Zero Values Over Time")
+        if cut_off > 0:
+            ax_box.set_title(f"{ax_box.get_title()}\nCut-off: {cut_off}")
+        ax_box.set_ylabel(f"Radiance (nW·cm$^{-2}$·sr$^{-1}$)")
+        ax_box.set_xlabel("Date")
+
+        # Add grid for better readability
+        ax_box.grid(True, linestyle="--", alpha=0.7)
+
+        # Adjust layout
+        plt.tight_layout()
+
+
 def create_frame(
     data: xr.DataArray,
     date: str,
@@ -382,8 +465,6 @@ def create_frame(
     plot_series: bool = False,
     all_dates: List[str] = None,
     all_data: Dict[str, xr.DataArray] = None,
-    use_confidence_interval: bool = False,
-    confidence_level: float = 0.95,
     sample_size: int = None,
     cut_off: float = 0,
     events = None,
@@ -402,8 +483,6 @@ def create_frame(
         plot_series (bool): If True, show lineplots of data values for all dates below the map
         all_dates (List[str]): List of all dates in the timelapse (required if plot_series is True)
         all_data (Dict[str, xr.DataArray]): Dictionary of all data by date (required if plot_series is True)
-        use_confidence_interval (bool): If True, use confidence interval plot instead of mean/median
-        confidence_level (float): Confidence level for the interval (0-1), default is 0.95 (95%)
         sample_size (int): Number of values to sample for each date
         cut_off (float): Minimum value to include in the series plot
         events: Optional event(s) to mark on the chart. Can be either a single tuple 
@@ -489,67 +568,18 @@ def create_frame(
         ax.set_title(f"{title}\nDate: {date}\nVariable: {variable_name}")
         if cut_off > 0:
             ax.set_title(f"{ax.get_title()}\nCut-off: {cut_off}")
-
-        date_objects = []
-
-        # Get data values for each date
-        for d in all_dates:
-            # Get non-NaN values for this date
-            values = all_data[d].values.flatten()
-            values = values[~np.isnan(values)]
-            values = values[values >= cut_off]
-            if len(values) > 0:
-                # Apply log transformation to match the map data
-                # Add 1 to avoid log(0) just like in prepare_data function
-                # values = np.log(values + 1)
-
-                # Convert date string to datetime object for proper plotting
-                date_obj = datetime.strptime(d, "%Y-%m-%d")
-                date_objects.append(date_obj)
-
-        # Create line plot if we have data
-        if use_confidence_interval:
-            # Use the seaborn confidence interval plot
-            plot_inset_chart(
-                ax_box,
-                all_dates,
-                all_data,
-                date,
-                confidence_level,
-                sample_size=sample_size,
-                cut_off=cut_off,
-                events=events,
-            )
-        elif date_objects:
-            # Add vertical line for current date
-            current_date_obj = datetime.strptime(date, "%Y-%m-%d")
-            ax_box.axvline(
-                x=current_date_obj,
-                color="gray",
-                linestyle="--",
-                linewidth=1.5,
-                label="Current Date",
-            )
-
-            # Format x-axis to show dates nicely
-            ax_box.xaxis.set_major_formatter(
-                plt.matplotlib.dates.DateFormatter("%Y-%m-%d")
-            )
-            plt.setp(ax_box.get_xticklabels(), rotation=45, ha="right")
-
-            # Add legend, title and labels
-            ax_box.legend(loc="best")
-            ax_box.set_title("Mean and Median of Non-Zero Values Over Time")
-            if cut_off > 0:
-                ax_box.set_title(f"{ax_box.get_title()}\nCut-off: {cut_off}")
-            ax_box.set_ylabel(f"Radiance (nW·cm$^{-2}$·sr$^{-1}$)")
-            ax_box.set_xlabel("Date")
-
-            # Add grid for better readability
-            ax_box.grid(True, linestyle="--", alpha=0.7)
-
-            # Adjust layout
-            plt.tight_layout()
+            
+        # Create the series plot
+        create_series_plot(
+            fig,
+            ax_box,
+            date,
+            all_dates,
+            all_data,
+            sample_size,
+            cut_off,
+            events,
+        )
     else:
         # Add title for single plot
         plt.title(f"{title}\ndate: {date}\nVariable: {variable_name}")
@@ -567,87 +597,94 @@ def plot_inset_chart(
     all_dates: List[str], 
     all_data: Dict[str, xr.DataArray], 
     current_date: str,
-    confidence_level: float = 0.95,
     fixed_y_limits: bool = True,
     sample_size: int = None,
     cut_off: float = 0,
     events = None,
 ) -> None:
-    """Create a seaborn lineplot with confidence intervals for each date.
+    """Create a plot with separate lines for each quartile of values for each date.
     
     Args:
         ax (matplotlib.axes.Axes): The axis to plot on
         all_dates (List[str]): List of all dates in the timelapse
         all_data (Dict[str, xr.DataArray]): Dictionary of all data by date
         current_date (str): The current date being displayed in the main plot
-        confidence_level (float): Confidence level for the interval (0-1)
         fixed_y_limits (bool): Whether to use fixed y-axis limits across all frames
         sample_size (int): Number of values to sample for each date
         cut_off (float): Minimum value to include in the analysis
         events: Optional event(s) to mark on the chart. Can be either a single tuple 
                ("event_name", date) or a list of tuples [("event_1", date1), ("event_2", date2)]
     """
-    # Prepare data for seaborn lineplot
-    data_for_plot = []
+    # Dictionary to store quartile values for each date
+    quartile_data = {
+        'Q1': [],  # First quartile (0-25%)
+        'Q2': [],  # Second quartile (25-50%)
+        'Q3': [],  # Third quartile (50-75%)
+        'Q4': []   # Fourth quartile (75-100%)
+    }
+    
     all_values = []
+    valid_dates = []
     
     # Process data for each date
     for date_str in all_dates:
-            
-        # Get non-NaN values for this date
         try:
+            # Get non-NaN values for this date
             values = all_data[date_str].values.flatten()
             values = values[~np.isnan(values)]
             values = np.exp(values) - 1
- 
-            # Apply cut-off filter (use greater than or equal to)
+            
+            # Apply cut-off filter
             values = values[values >= cut_off]
             
             if len(values) > 0:
                 # Store all values for y-axis limit calculation
                 all_values.extend(values)
+                valid_dates.append(date_str)
                 
-                # Create multiple entries for each date to allow for proper CI calculation
-                # Sample the data if there are too many points to keep performance reasonable
+                # Sample the data if there are too many points
                 if sample_size is not None and len(values) > sample_size:
-                    # Random sampling to reduce data size while preserving distribution
                     indices = np.random.choice(len(values), size=sample_size, replace=False)
                     values = values[indices]
-                    
-                # Create a dataframe entry for each value
-                for val in values:
-                    data_for_plot.append({
-                        'date': date_str,
-                        'value': val
-                    })
+                
+                # Calculate quartiles for this date
+                q1_val = np.percentile(values, 25)
+                q2_val = np.percentile(values, 50)  # median
+                q3_val = np.percentile(values, 75)
+                q4_val = np.percentile(values, 100)  # max value
+                
+                # Store quartile values with their dates
+                quartile_data['Q1'].append({'date': pd.to_datetime(date_str), 'value': q1_val})
+                quartile_data['Q2'].append({'date': pd.to_datetime(date_str), 'value': q2_val})
+                quartile_data['Q3'].append({'date': pd.to_datetime(date_str), 'value': q3_val})
+                quartile_data['Q4'].append({'date': pd.to_datetime(date_str), 'value': q4_val})
             else:
                 print(f"No valid values above cut-off for date: {date_str}")
         except Exception as e:
             print(f"Error processing data for date {date_str}: {e}")
             continue
     
-    # Convert to pandas DataFrame
-    if not data_for_plot:
-        print("No valid data found for confidence interval plot")
+    # Check if we have valid data
+    if not valid_dates:
+        print("No valid data found for quartile plot")
         return
-        
-    df = pd.DataFrame(data_for_plot)
-    df['date'] = pd.to_datetime(df['date'])
-    df = df.set_index('date')
     
-    # Create the seaborn lineplot with confidence interval
-    sns.pointplot(
-        data=df,
-        x=df.index,
-        y='value',
-        ax=ax,
-        errorbar=("ci", confidence_level*100),
-        native_scale=True
-    )
+    # Convert quartile data to DataFrames and plot each quartile
+    colors = ['blue', 'green', 'orange', 'red']
+    labels = ['First Quartile (25%)', 'Second Quartile (50%)', 'Third Quartile (75%)', 'Fourth Quartile (100%)']
+    
+    for i, (quartile, data) in enumerate(quartile_data.items()):
+        df = pd.DataFrame(data)
+        df = df.set_index('date')
+        df = df.sort_index()  # Sort by date
+        
+        # Plot the quartile line
+        ax.plot(df.index, df['value'], marker='o', linestyle='-', color=colors[i], label=labels[i])
+    
+    # Set x-axis limits
     dates = [pd.to_datetime(d) for d in all_dates]
     min_date = min(dates)
     max_date = max(dates)
-    
     ax.set_xlim(min_date - pd.Timedelta(days=1), max_date + pd.Timedelta(days=1))
     # Add vertical line for current date
     current_date_obj = pd.to_datetime(current_date)
@@ -701,7 +738,7 @@ def plot_inset_chart(
     
     # Add legend, title and labels
     ax.legend(loc='best')
-    ax.set_title(f'Nightlight Values with {confidence_level*100:.0f}% Confidence Interval')
+    ax.set_title(f'Nightlight Values by Quartile')
     if cut_off > 0:
         ax.set_title(f"{ax.get_title()}\nCut-off: {cut_off}")
     ax.set_ylabel(f'Radiance (nW·cm$^{{-2}}$·sr$^{{-1}}$)')
