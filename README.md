@@ -56,7 +56,10 @@ files = download.download_earthaccess(
     region=region,
 )
 
-variable_name = "AllAngle_Composite_Snow_Free"  # for VNP46A3 and VNP46A4 or "DNB_BRDF-Corrected_NTL" for VNP46A2
+# Variable names:
+# "DNB_BRDF-Corrected_NTL" for VNP46A2 (daily data)
+# "AllAngle_Composite_Snow_Free" for VNP46A3 (monthly data) and VNP46A4 (annual data)
+variable_name = "AllAngle_Composite_Snow_Free"  
 ```
 
 ### 3. Create visualizations
