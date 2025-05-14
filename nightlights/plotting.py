@@ -8,15 +8,11 @@ import cartopy.feature as cfeature
 import numpy as np
 import os
 import xarray as xr
-from pathlib import Path
 from tqdm import tqdm
 import imageio.v2 as imageio
 from datetime import datetime
-from typing import Dict, List, Tuple, Union, Optional
-import seaborn as sns
-import pandas as pd
+from typing import List, Tuple
 
-np.random.seed(19680801)
 
 # Constants
 DEFAULT_CMAP = "cividis"
@@ -162,11 +158,9 @@ def plot_nightlights(
         output_dir (str, optional): Directory to save the plot. If None, the plot will be displayed.
         log_scale (bool): Whether to apply log scaling
         cmap (str): Colormap to use for the plot
-        vmin (float, optional): Minimum value for color scaling
-        vmax (float, optional): Maximum value for color scaling
         region (shapely.geometry.Polygon, optional): Region to filter by
         region_crs (int): Coordinate reference system of the region
-
+        bins (int): Number of bins for color scaling
     Returns:
         tuple: (fig, ax) matplotlib figure and axis objects
     """
@@ -201,7 +195,7 @@ def plot_nightlights(
     lon_mesh, lat_mesh = np.meshgrid(lons, lats)
 
     # Prepare to create frames for each date with consistent color scaling
-    levels = MaxNLocator(nbins=15).tick_values(global_min, global_max)
+    levels = MaxNLocator(nbins=bins).tick_values(global_min, global_max)
     norm = BoundaryNorm(levels, ncolors=plt.colormaps[DEFAULT_CMAP].N, clip=True)
 
     # Plot the data using pcolormesh
@@ -240,8 +234,6 @@ def plot_nightlights(
 
 
 
-
-
 def create_timelapse_gif(
     files: List[str],
     variable_name: str,
@@ -251,10 +243,6 @@ def create_timelapse_gif(
     region_crs: int = 4326,
     fps: float = 5.0,
     bins: int = 15,
-    plot_series: bool = False,
-    sample_size: int = None,
-    cut_off: float = 0,
-    events = None,  
 ) -> None:
     """Create a timelapse GIF from multiple dates of data, using only region-filtered data.
 
@@ -267,11 +255,6 @@ def create_timelapse_gif(
         region_crs (int): Coordinate reference system of the region
         fps (float): Frames per second for the GIF
         bins (int): Number of bins for color scaling
-        plot_series (bool): If True, show lineplots of data values for all dates below the map
-        sample_size (int): Number of values to sample for each date
-        cut_off (float): Minimum value to include in the series plot
-        events: Optional event(s) to mark on the chart. Can be either a single tuple 
-               ("event_name", date) or a list of tuples [("event_1", date1), ("event_2", date2)]
     """
     # Create output directory if it doesn't exist
     os.makedirs(output_dir, exist_ok=True)
@@ -342,12 +325,6 @@ def create_timelapse_gif(
                 timelapse_dir,
                 region,
                 norm,
-                plot_series=plot_series,
-                all_dates=sorted_dates,
-                all_data=date_data_dict,
-                sample_size=sample_size,
-                cut_off=cut_off,
-                events=events,
             )
             frame_paths.append(frame_path)
 
@@ -361,90 +338,6 @@ def create_timelapse_gif(
         print(f"Timelapse GIF created at: {gif_path}")
 
 
-
-
-
-def create_series_plot(
-    fig: plt.Figure,
-    ax_box: plt.Axes,
-    date: str,
-    all_dates: List[str],
-    all_data: Dict[str, xr.DataArray],
-    sample_size: int = None,
-    cut_off: float = 0,
-    events = None,
-) -> None:
-    """Create a series plot below the main map.
-
-    Args:
-        fig (plt.Figure): The figure object to add the series plot to
-        ax_box (plt.Axes): The axis to plot the series on
-        date (str): The current date being displayed in the main plot
-        all_dates (List[str]): List of all dates in the timelapse
-        all_data (Dict[str, xr.DataArray]): Dictionary of all data by date
-        sample_size (int): Number of values to sample for each date
-        cut_off (float): Minimum value to include in the series plot
-        events: Optional event(s) to mark on the chart. Can be either a single tuple 
-               ("event_name", date) or a list of tuples [("event_1", date1), ("event_2", date2)]
-    """
-    date_objects = []
-
-    # Get data values for each date
-    for d in all_dates:
-        # Get non-NaN values for this date
-        values = all_data[d].values.flatten()
-        values = values[~np.isnan(values)]
-        values = values[values >= cut_off]
-        if len(values) > 0:
-            # Apply log transformation to match the map data
-            # Add 1 to avoid log(0) just like in prepare_data function
-            # values = np.log(values + 1)
-
-            # Convert date string to datetime object for proper plotting
-            date_obj = datetime.strptime(d, "%Y-%m-%d")
-            date_objects.append(date_obj)
-
-    # Create line plot if we have data
-    plot_inset_chart(
-        ax_box,
-        all_dates,
-        all_data,
-        date,
-        sample_size=sample_size,
-        cut_off=cut_off,
-        events=events,
-    )
-    # Add vertical line for current date
-    current_date_obj = datetime.strptime(date, "%Y-%m-%d")
-    ax_box.axvline(
-        x=current_date_obj,
-        color="gray",
-        linestyle="--",
-        linewidth=1.5,
-        label="Current Date",
-    )
-
-    # Format x-axis to show dates nicely
-    ax_box.xaxis.set_major_formatter(
-        plt.matplotlib.dates.DateFormatter("%Y-%m-%d")
-    )
-    plt.setp(ax_box.get_xticklabels(), rotation=45, ha="right")
-
-    # Add legend, title and labels
-    ax_box.legend(loc="best")
-    ax_box.set_title("Quartiles of Values Over Time")
-    if cut_off > 0:
-        ax_box.set_title(f"{ax_box.get_title()}\nCut-off: {cut_off}")
-    ax_box.set_ylabel(f"Radiance (nW·cm$^{-2}$·sr$^{-1}$)")
-    ax_box.set_xlabel("Date")
-
-    # Add grid for better readability
-    ax_box.grid(True, linestyle="--", alpha=0.7)
-
-    # Adjust layout
-    plt.tight_layout()
-
-
 def create_frame(
     data: xr.DataArray,
     date: str,
@@ -454,12 +347,6 @@ def create_frame(
     region=None,
     norm: BoundaryNorm = None,
     cmap: str = DEFAULT_CMAP,
-    plot_series: bool = False,
-    all_dates: List[str] = None,
-    all_data: Dict[str, xr.DataArray] = None,
-    sample_size: int = None,
-    cut_off: float = 0,
-    events = None,
 ) -> str:
     """Create a single frame for the timelapse.
 
@@ -472,69 +359,13 @@ def create_frame(
         region (shapely.geometry.Polygon, optional): Region used for filtering
         norm (BoundaryNorm): BoundaryNorm object for color scaling
         cmap (str): Colormap to use for the plot
-        plot_series (bool): If True, show lineplots of data values for all dates below the map
-        all_dates (List[str]): List of all dates in the timelapse (required if plot_series is True)
-        all_data (Dict[str, xr.DataArray]): Dictionary of all data by date (required if plot_series is True)
-        sample_size (int): Number of values to sample for each date
-        cut_off (float): Minimum value to include in the series plot
-        events: Optional event(s) to mark on the chart. Can be either a single tuple 
-               ("event_name", date) or a list of tuples [("event_1", date1), ("event_2", date2)]
     Returns:
         str: Path to the saved frame image
     """
     # Format date for display
     date = datetime.strptime(date, "%Y-%m-%d").strftime("%Y-%m-%d")
 
-    if plot_series and all_dates and all_data:
-        # Create figure with two subplots - map on top, line plot on bottom
-        fig = plt.figure(figsize=(12, 12))
-
-        # Create a simple 2-row grid with height ratios 3:1
-        gs = plt.GridSpec(2, 1, figure=fig, height_ratios=[5, 1])
-
-        # Map subplot takes up 75% of the height
-        ax_map = fig.add_subplot(gs[0], projection=ccrs.PlateCarree())
-
-        # Line plot subplot takes up 25% of the height
-        ax_box = fig.add_subplot(gs[1])
-
-        # Set up map features on the map subplot
-        ax_map.set_facecolor(MAP_BACKGROUND_COLOR)
-
-        # Add water bodies
-        ax_map.add_feature(cfeature.OCEAN, facecolor=MAP_WATER_COLOR)
-        ax_map.add_feature(cfeature.LAKES, facecolor=MAP_WATER_COLOR)
-        ax_map.add_feature(
-            cfeature.RIVERS, edgecolor=MAP_WATER_COLOR, linewidth=0.5
-        )
-
-        # Add coastlines, borders, and other features
-        ax_map.coastlines(
-            resolution="10m", color=MAP_COASTLINE_COLOR, linewidth=0.5
-        )
-        ax_map.add_feature(
-            cfeature.BORDERS, linewidth=0.3, edgecolor=MAP_BORDER_COLOR
-        )
-        ax_map.add_feature(
-            cfeature.STATES, linewidth=0.2, edgecolor=MAP_STATE_COLOR
-        )
-
-        # Add gridlines
-        gl = ax_map.gridlines(
-            draw_labels=True,
-            linewidth=0.5,
-            color=MAP_GRID_COLOR,
-            alpha=0.5,
-            linestyle="--",
-        )
-        gl.top_labels = False
-        gl.right_labels = False
-
-        # Use ax_map for the map
-        ax = ax_map
-    else:
-        # Create the plot with common features (single plot)
-        fig, ax = setup_map_figure()
+    fig, ax = setup_map_figure()
 
     # Plot the data with consistent color scaling
     mesh = ax.pcolormesh(
@@ -555,26 +386,8 @@ def create_frame(
     else:
         set_map_extent(ax, data)
 
-    # Add title to the map
-    if plot_series and all_dates and all_data:
-        ax.set_title(f"{title}\nDate: {date}\nVariable: {variable_name}")
-        if cut_off > 0:
-            ax.set_title(f"{ax.get_title()}\nCut-off: {cut_off}")
-            
-        # Create the series plot
-        create_series_plot(
-            fig,
-            ax_box,
-            date,
-            all_dates,
-            all_data,
-            sample_size,
-            cut_off,
-            events,
-        )
-    else:
-        # Add title for single plot
-        plt.title(f"{title}\ndate: {date}\nVariable: {variable_name}")
+    # Add title for single plot
+    ax.set_title(f"{title}\ndate: {date}\nVariable: {variable_name}")
 
     # Save the frame
     frame_path = os.path.join(output_dir, f"frame_{date.replace('-','')}.png")
@@ -582,152 +395,6 @@ def create_frame(
     plt.close(fig)
 
     return frame_path
-
-
-def plot_inset_chart(
-    ax, 
-    all_dates: List[str], 
-    all_data: Dict[str, xr.DataArray], 
-    fixed_y_limits: bool = True,
-    sample_size: int = None,
-    cut_off: float = 0,
-    events = None,
-) -> None:
-    """Create a plot with separate lines for each quartile of values for each date.
-    
-    Args:
-        ax (matplotlib.axes.Axes): The axis to plot on
-        all_dates (List[str]): List of all dates in the timelapse
-        all_data (Dict[str, xr.DataArray]): Dictionary of all data by date
-        fixed_y_limits (bool): Whether to use fixed y-axis limits across all frames
-        sample_size (int): Number of values to sample for each date
-        cut_off (float): Minimum value to include in the analysis
-        events: Optional event(s) to mark on the chart. Can be either a single tuple 
-               ("event_name", date) or a list of tuples [("event_1", date1), ("event_2", date2)]
-    """
-    # Dictionary to store quartile values for each date
-    quartile_data = {
-        'Q1': [],  # First quartile (0-25%)
-        'Q2': [],  # Second quartile (25-50%)
-        'Q3': [],  # Third quartile (50-75%)
-        'Q4': []   # Fourth quartile (75-100%)
-    }
-    
-    all_values = []
-    valid_dates = []
-    
-    # Process data for each date
-    for date_str in all_dates:
-        try:
-            # Get non-NaN values for this date
-            values = all_data[date_str].values.flatten()
-            values = values[~np.isnan(values)]
-            values = np.exp(values) - 1
-            
-            # Apply cut-off filter
-            values = values[values >= cut_off]
-            
-            if len(values) > 0:
-                # Store all values for y-axis limit calculation
-                all_values.extend(values)
-                valid_dates.append(date_str)
-                
-                # Sample the data if there are too many points
-                if sample_size is not None and len(values) > sample_size:
-                    indices = np.random.choice(len(values), size=sample_size, replace=False)
-                    values = values[indices]
-                
-                # Calculate quartiles for this date
-                q1_val = np.percentile(values, 25)
-                q2_val = np.percentile(values, 50)  # median
-                q3_val = np.percentile(values, 75)
-                q4_val = np.percentile(values, 100)  # max value
-                
-                # Store quartile values with their dates
-                quartile_data['Q1'].append({'date': pd.to_datetime(date_str), 'value': q1_val})
-                quartile_data['Q2'].append({'date': pd.to_datetime(date_str), 'value': q2_val})
-                quartile_data['Q3'].append({'date': pd.to_datetime(date_str), 'value': q3_val})
-                quartile_data['Q4'].append({'date': pd.to_datetime(date_str), 'value': q4_val})
-            else:
-                print(f"No valid values above cut-off for date: {date_str}")
-        except Exception as e:
-            print(f"Error processing data for date {date_str}: {e}")
-            continue
-    
-    # Check if we have valid data
-    if not valid_dates:
-        print("No valid data found for quartile plot")
-        return
-    
-    # Convert quartile data to DataFrames and plot each quartile
-    colors = ['blue', 'green', 'orange', 'red']
-    labels = ['First Quartile (25%)', 'Second Quartile (50%)', 'Third Quartile (75%)', 'Fourth Quartile (100%)']
-    
-    for i, (quartile, data) in enumerate(quartile_data.items()):
-        df = pd.DataFrame(data)
-        df = df.set_index('date')
-        df = df.sort_index()  # Sort by date
-        
-        # Plot the quartile line
-        ax.plot(df.index, df['value'], marker='o', linestyle='-', color=colors[i], label=labels[i])
-    
-    # Set x-axis limits
-    dates = [pd.to_datetime(d) for d in all_dates]
-    min_date = min(dates)
-    max_date = max(dates)
-    ax.set_xlim(min_date - pd.Timedelta(days=1), max_date + pd.Timedelta(days=1))
-
-    # Add event markers if provided
-    if events is not None:
-        # Convert single event to list for uniform processing
-        event_list = [events] if isinstance(events, tuple) else events
-        
-        for event_name, event_date in event_list:
-            # Convert date to datetime if it's a string
-            if isinstance(event_date, str):
-                event_date = pd.to_datetime(event_date)
-                
-            # Add vertical line for the event
-            ax.axvline(
-                x=event_date,
-                color='red',
-                linestyle='-',
-                linewidth=1.5,
-                alpha=0.7,
-                label=event_name,
-            )
-    
-    # Calculate and set fixed y-axis limits if requested
-    # if fixed_y_limits and all_values:
-    #     # Calculate percentiles to exclude extreme outliers
-    #     y_min = np.mean(all_values) - 5*np.std(all_values)
-    #     y_max = np.mean(all_values) + 5*np.std(all_values)
-        
-    #     # Add some padding
-    #     y_range = y_max - y_min
-    #     y_min = max(0, y_min - 0.05 * y_range)  # Ensure it's not negative
-    #     y_max = y_max + 0.05 * y_range
-        
-    #     # Set the limits
-    #     ax.set_ylim(y_min, y_max)
-    
-    # Format x-axis to show dates nicely
-    ax.xaxis.set_major_formatter(
-        plt.matplotlib.dates.DateFormatter('%Y-%m-%d')
-    )
-    plt.setp(ax.get_xticklabels(), rotation=45, ha='right')
-    
-    # Add legend, title and labels
-    ax.legend(loc='best')
-    ax.set_title(f'Nightlight Values by Quartile')
-    if cut_off > 0:
-        ax.set_title(f"{ax.get_title()}\nCut-off: {cut_off}")
-    ax.set_ylabel(f'Radiance (nW·cm$^{{-2}}$·sr$^{{-1}}$)')
-    ax.set_xlabel('Date')
-    
-    # Add grid for better readability
-    ax.grid(True, linestyle='--', alpha=0.7)
-    
 
 
 
