@@ -257,7 +257,7 @@ def group_files_by_date(files: List[str]) -> Dict[str, List[str]]:
     """
     files_by_date = defaultdict(list)
 
-    for file in tqdm(files, desc="Grouping files by date"):
+    for file in files:
         try:
             with rxr.open_rasterio(file) as data_obj:
                 date = data_obj.attrs.get("RangeBeginningDate", "unknown")
