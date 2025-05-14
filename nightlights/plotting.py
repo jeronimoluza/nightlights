@@ -11,7 +11,7 @@ import xarray as xr
 from tqdm import tqdm
 import imageio.v2 as imageio
 from datetime import datetime
-from typing import List, Tuple
+from typing import List, Tuple, Union
 
 
 # Constants
@@ -25,6 +25,9 @@ MAP_BORDER_COLOR = "gray"  # Color for country borders
 MAP_STATE_COLOR = "gray"  # Color for state/province borders
 MAP_GRID_COLOR = "gray"  # Color for gridlines
 MAP_WATER_COLOR = "lightblue"  # Color for water bodies (ocean, lakes, rivers)
+
+LOG_RADIANCE_LABEL = f"Log radiance (nW·cm$^{-2}$·sr$^{-1}$)"
+RADIANCE_LABEL = f"Radiance (nW·cm$^{-2}$·sr$^{-1}$)"
 
 from nightlights.process import (
     process_files_for_date,
@@ -132,9 +135,9 @@ def add_colorbar(
     fig = ax.get_figure()
     cbar = fig.colorbar(mesh, ax=ax, pad=0.01, shrink=0.8)
     if log_scale:
-        cbar.set_label(f"Log radiance (nW·cm$^{-2}$·sr$^{-1}$)")
+        cbar.set_label(LOG_RADIANCE_LABEL)
     else:
-        cbar.set_label(f"Radiance (nW·cm$^{-2}$·sr$^{-1}$)")
+        cbar.set_label(RADIANCE_LABEL)
     return cbar
 
 
@@ -274,7 +277,6 @@ def create_timelapse_gif(
         os.makedirs(timelapse_dir, exist_ok=True)
 
         # First, find global min and max values across all dates for consistent color scaling
-        print("Finding global min/max values for consistent color scaling...")
         global_min = float("inf")
         global_max = float("-inf")
 
@@ -411,3 +413,123 @@ def create_gif(
         imageio.mimsave(output_path, images, fps=fps, loop=0)
     except Exception as e:
         print(f"Error creating GIF: {e}")
+
+
+def create_lineplot(
+    files: List[str],
+    variable_name: str,
+    title: str,
+    output_dir: str,
+    log_scale: bool = False,
+    region=None,
+    region_crs: int = 4326,
+    functions: List[dict] = None,
+) -> str:
+    """Create a lineplot showing the values of a variable over time, applying different functions to the data.
+
+    Args:
+        files (List[str]): List of file paths to process
+        variable_name (str): Name of the variable to extract and plot
+        title (str): Title for the plot
+        output_dir (str): Directory to save the lineplot
+        log_scale (bool): Whether to apply log scaling
+        region: Optional region to filter data by (Polygon or MultiPolygon)
+        region_crs (int): Coordinate reference system of the region
+        functions (List[dict]): List of dictionaries with format {"label": function}, 
+                               where function is a callable that processes the data
+
+    Returns:
+        str: Path to the saved lineplot image
+    """
+    if not functions:
+        functions = [{"Mean": np.mean}]  # Default function if none provided
+
+    # Group files by date
+    files_by_date = group_files_by_date(files)
+    
+    if not files_by_date:
+        print("No valid files found for plotting.")
+        return None
+
+    # Create a dictionary to store processed data for each date and function
+    date_values = {}
+    
+    # Process each date's data
+    for date, date_files in sorted(files_by_date.items()):
+        try:
+            # Process files for this date
+            combined_data = process_files_for_date(
+                date_files, variable_name, log_scale=log_scale, region=region, region_crs=region_crs
+            )
+            
+            if combined_data is None or np.all(np.isnan(combined_data)):
+                print(f"Warning: No valid data for date {date}, skipping")
+                continue
+            
+            # Store the processed data for this date
+            date_values[date] = combined_data
+        except Exception as e:
+            print(f"Error processing data for date {date}: {e}")
+    
+    if not date_values:
+        print("No valid data found for any date. Cannot create lineplot.")
+        return None
+    
+    # Calculate function values for each date
+    results = {}
+    for func_dict in functions:
+        for label, func in func_dict.items():
+            results[label] = []
+    
+    dates = sorted(date_values.keys())
+    x_values = [datetime.strptime(date, "%Y-%m-%d") for date in dates]
+    
+    # Apply each function to each date's data
+    for date in dates:
+        data = date_values[date]
+        # Remove NaN values for calculations
+        valid_data = data.values[~np.isnan(data.values)]
+        
+        if len(valid_data) > 0:
+            for func_dict in functions:
+                for label, func in func_dict.items():
+                    try:
+                        value = func(valid_data)
+                        results[label].append(value)
+                    except Exception as e:
+                        print(f"Error applying function {label} to data for date {date}: {e}")
+                        results[label].append(np.nan)
+        else:
+            # If no valid data, add NaN for all functions
+            for func_dict in functions:
+                for label in func_dict.keys():
+                    results[label].append(np.nan)
+    
+    # Create the lineplot
+    fig, ax = plt.subplots(figsize=(12, 8))
+    
+    for func_dict in functions:
+        for label, _ in func_dict.items():
+            ax.plot(x_values, results[label], marker='o', linestyle='-', label=label)
+    
+    # Format the plot
+    ax.set_title(f"{title}\nVariable: {variable_name}")
+    ax.set_xlabel("Date")
+    if log_scale:
+        ax.set_ylabel(LOG_RADIANCE_LABEL)
+    else:
+        ax.set_ylabel(RADIANCE_LABEL)
+    ax.grid(True, linestyle='--', alpha=0.7)
+    ax.legend()
+    
+    # Format x-axis dates
+    fig.autofmt_xdate()
+    
+    # Save the plot
+    os.makedirs(output_dir, exist_ok=True)
+    output_path = os.path.join(output_dir, f"lineplot_{variable_name}.png")
+    plt.savefig(output_path, dpi=300, bbox_inches="tight")
+    plt.close(fig)
+    
+    print(f"Lineplot created at: {output_path}")
+    return output_path

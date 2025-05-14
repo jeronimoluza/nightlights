@@ -1,8 +1,8 @@
 
 def do_main():
-    from shapely import wkt
     import geopandas as gpd
     import pandas as pd
+    import numpy as np
 
     from nightlights import download, plotting, process
 
@@ -55,7 +55,23 @@ def do_main():
         fps=2.0,
     )
 
+    # Define functions to apply to the data
+    functions = [
+        {"Mean": np.mean},
+        {"Median": np.median},
+        {"Max": np.max}
+    ]
 
+    # Create the lineplot
+    plotting.create_lineplot(
+        files=files,
+        variable_name=variable_name,
+        title="Nightlights Trends",
+        output_dir=plot_dir,
+        region=region,
+        region_crs=region_crs,
+        functions=functions
+    )
     raise
     # Use the optimized polygonization approach (default behavior)
     gdf = process.polygonize(
