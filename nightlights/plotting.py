@@ -280,9 +280,7 @@ def create_timelapse_gif(
 
         # Process each date to get combined data and find global min/max
         date_data_dict = {}
-        for date, date_files in tqdm(
-            files_by_date.items(), desc="Processing dates for min/max"
-        ):
+        for date, date_files in files_by_date.items():
             # Process files for this date
             combined_data = process_files_for_date(
                 files=date_files, variable_name=variable_name, log_scale=True, region=region, region_crs=region_crs
