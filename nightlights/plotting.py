@@ -393,7 +393,7 @@ def create_frame(
         set_map_extent(ax, data)
 
     # Add title for single plot
-    ax.set_title(f"{title}\ndate: {date}\nVariable: {variable_name}")
+    ax.set_title(f"{title}\nDate: {date}")
 
     # Save the frame
     frame_path = os.path.join(output_dir, f"frame_{date.replace('-','')}.png")
@@ -537,8 +537,11 @@ def create_lineplot(
             )
 
     # Format the plot
+    title = f"{title}"
+    if cut_off > 0:
+        title += f"\nCut-off Value: {cut_off}"
     ax.set_title(
-        f"{title}\nVariable: {variable_name}\nCut Off Value: {cut_off}"
+        title
     )
     ax.set_xlabel("Date")
     if log_scale:
@@ -719,7 +722,7 @@ def side_by_side(
         norm=norm,
         transform=ccrs.PlateCarree(),
     )
-    ax1.set_title(f"{title}\nDate: {date1_display}")
+    ax1.set_title(f"Date: {date1_display}")
 
     # Plot data on the right subplot (date2)
     mesh2 = ax2.pcolormesh(
@@ -730,7 +733,7 @@ def side_by_side(
         norm=norm,
         transform=ccrs.PlateCarree(),
     )
-    ax2.set_title(f"{title}\nDate: {date2_display}")
+    ax2.set_title(f"Date: {date2_display}")
 
     # Set the extent for both maps
     if region is not None:
@@ -747,7 +750,7 @@ def side_by_side(
 
     # Add a single horizontal colorbar below the two maps
     cbar_ax = fig.add_axes(
-        [0.15, 0.2, 0.7, 0.05]
+        [0.15, 0.05, 0.7, 0.05]
     )  # [left, bottom, width, height]
     cbar = fig.colorbar(mesh2, cax=cbar_ax, orientation="horizontal")
     if log_scale:
@@ -756,7 +759,7 @@ def side_by_side(
         cbar.set_label(RADIANCE_LABEL)
 
     # Add overall title
-    fig.suptitle(f"{title}\nVariable: {variable_name}", fontsize=16, y=0.85)
+    fig.suptitle(f"{title}", fontsize=16, y=0.95)
 
     # Save the figure
     if output_dir:

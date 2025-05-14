@@ -1,20 +1,22 @@
 
 def do_main():
-    import geopandas as gpd
-    import pandas as pd
     import numpy as np
 
     from nightlights import download, plotting, process
 
     download_dir = "./data/raw"
-    plot_dir = "./data/plots"
+    plot_dir = "./assets/"
 
     # Define search parameters
     short_name = "VNP46A3"
-    start_date = "2023-04-15"
-    end_date = "2024-05-05"
+    start_date = "2021-11-01"
+    end_date = "2022-05-01"
 
-    regions = ["Andalucía, Spain"]
+    regions = [
+        "Kyiv, Ukraine",
+        "Kyiv Oblast, Ukraine",
+        ]
+    
     region_gdf = download.find_region(query=regions)
 
     region_crs = region_gdf.crs.to_epsg()
@@ -33,61 +35,60 @@ def do_main():
 
     plotting.plot_nightlights(
         files,
-        title="Andalucía Nightlights",
+        title="Nightlight Intensity\nKyiv City and Oblast",
         variable_name=variable_name,
-        date="2024-01-01",
+        date="2021-11-01",
         output_dir=plot_dir,
         region=region,
     )
 
-    raise
     plotting.create_timelapse_gif(
         files,
         variable_name=variable_name,
-        title="Andalucía Nightlights",
+        title="Nightlight Intensity\nKyiv City and Oblast",
         output_dir=plot_dir,
         region=region,
         region_crs=region_crs,
         fps=2.0,
     )
 
-    # # Define functions to apply to the data
+    events = [
+        ("Start of the conflict\nAttacks on Kyiv's Energy Infrastructure", "2022-02-01"),
+    ]
+    # Define functions to apply to the data
     functions = [
         {"Mean": np.mean},
         {"Median": np.median},
     ]
 
-    events = [("Event 1", "2023-10-01"), ("Event 2", "2024-02-01")]
-    # Create the lineplot
     plotting.create_lineplot(
         files=files,
         variable_name=variable_name,
-        title="Nightlights Trends",
+        title="Nightlight Intensity\nKyiv City and Oblast",
         output_dir=plot_dir,
         region=region,
         region_crs=region_crs,
         functions=functions,
-        events=events
+        events=events,
+        cut_off=1,
     )
 
-#     plotting.side_by_side(
-#     files=files,
-#     variable_name=variable_name,
-#     title="Nightlights Comparison",
-#     date1="2023-05-01",
-#     date2="2024-05-01",
-#     region=region,
-#     region_crs=region_crs,
-#     output_dir=plot_dir,
-#     bins=15,
-#     log_scale=True
-# )
-    # Use the optimized polygonization approach (default behavior)
+    plotting.side_by_side(
+        files=files,
+        variable_name=variable_name,
+        title="Nightlight Intensity\nKyiv City and Oblast: Pre-War vs Post-War",
+        date1="2021-11-01",
+        date2="2022-05-01",
+        region=region,
+        region_crs=region_crs,
+        output_dir=plot_dir,
+        bins=15,
+        log_scale=True,
+    )
     gdf = process.polygonize(
         files, variable_name=variable_name, region=region, region_crs=region_crs, optimize_geometry=True
     )
-    print(gdf.head())
-    gdf[gdf.date=='2021-01-01'].to_csv('data/polygonized.csv')
+    print(gdf.head().to_markdown())
 
 
 if __name__ == "__main__":

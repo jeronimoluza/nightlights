@@ -145,9 +145,7 @@ def load_data_from_h5(
                 f"Variable {variable_name} not found in file {path}\n"
                 f"Available variables: {list(data_obj.var())}"
             )
-        # except rxr.exceptions.NoDataInBounds as e:
-        #     print(f"No data in bounds for file {path}: {e}")
-        # return None, None, None
+
 
 
 def prepare_data(
@@ -810,5 +808,6 @@ def process_files_for_date(
                 combined_data = combined_data.max(dim="tile", skipna=True)
         except Exception as e:
             print(f"Error processing file {file}: {e}")
-
+        except rxr.exceptions.NoDataInBounds as e:
+            print(f"No data in bounds for file {file}: {e}")
     return combined_data

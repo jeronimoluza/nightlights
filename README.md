@@ -26,20 +26,21 @@ poetry install
 
 ```python
 from nightlights import download, plotting, process
-import pandas as pd
-import numpy as np
 
 # Define directories
 download_dir = "./data/raw"
-plot_dir = "./data/plots"
+plot_dir = "./assets/"
 
 # Define search parameters
-short_name = "VNP46A3"  # VIIRS Black Marble product
-start_date = "2023-04-15"
-end_date = "2024-05-05"
+short_name = "VNP46A3" # VIIRS Black Marble product
+start_date = "2021-11-01"
+end_date = "2022-05-01"
 
 # Define region of interest
-regions = ["Andalucía, Spain"]
+regions = [
+    "Kyiv, Ukraine",
+    "Kyiv Oblast, Ukraine",
+]
 region_gdf = download.find_region(query=regions)
 region_crs = region_gdf.crs.to_epsg()
 region = region_gdf.union_all()
@@ -64,9 +65,25 @@ variable_name = "AllAngle_Composite_Snow_Free"
 
 ### 3. Create visualizations
 
+#### Single Date Map
+
+```python
+plotting.plot_nightlights(
+    files,
+    title="Nightlight Intensity\nKyiv City and Oblast",
+    variable_name=variable_name,
+    date="2021-11-01",
+    output_dir=plot_dir,
+    region=region,
+)
+```
+![Single Date Map](./assets/nightlights_20211101_AllAngle_Composite_Snow_Free.png)
+
 #### Time Series Lineplot with Events
 
 ```python
+import numpy as np
+
 # Define functions to apply to the data
 functions = [
     {"Mean": np.mean},
@@ -74,20 +91,23 @@ functions = [
 ]
 
 # Define important events to mark on the plot
-events = [("Event 1", "2023-10-01"), ("Event 2", "2024-02-01")]
+events = [
+    ("Start of the conflict\nAttacks on Kyiv's Energy Infrastructure", "2022-02-01"),
+]
 
-# Create the lineplot
 plotting.create_lineplot(
     files=files,
     variable_name=variable_name,
-    title="Nightlights Trends",
+    title="Nightlight Intensity\nKyiv City and Oblast",
     output_dir=plot_dir,
     region=region,
     region_crs=region_crs,
     functions=functions,
-    events=events
+    events=events,
+    cut_off=1,
 )
 ```
+![Time Series Lineplot with Events](./assets/lineplot_20211101_AllAngle_Composite_Snow_Free.png)
 
 #### Side-by-Side Comparison
 
@@ -95,9 +115,9 @@ plotting.create_lineplot(
 plotting.side_by_side(
     files=files,
     variable_name=variable_name,
-    title="Nightlights Comparison",
-    date1="2023-05-01",
-    date2="2024-05-01",
+    title="Nightlight Intensity\nKyiv City and Oblast: Pre-War vs Post-War",
+    date1="2021-11-01",
+    date2="2022-07-01",
     region=region,
     region_crs=region_crs,
     output_dir=plot_dir,
@@ -105,6 +125,7 @@ plotting.side_by_side(
     log_scale=True
 )
 ```
+![Side-by-Side Comparison](./assets/comparison_AllAngle_Composite_Snow_Free_20211101_20220501.png)
 
 #### Timelapse Animation
 
@@ -112,25 +133,15 @@ plotting.side_by_side(
 plotting.create_timelapse_gif(
     files=files,
     variable_name=variable_name,
-    title="Andalucía Nightlights",
+    title="Israel Invades Gaza",
     output_dir=plot_dir,
     region=region,
     region_crs=region_crs,
     fps=2.0,
 )
 ```
+![Timelapse Animation](./assets/timelapse_AllAngle_Composite_Snow_Free.gif)
 
-#### Single Date Map
-
-```python
-plotting.plot_nightlights(
-    files,
-    variable_name=variable_name,
-    date="2023-05-01",
-    output_dir=plot_dir,
-    region=region,
-)
-```
 
 ### 4. Advanced Processing: Polygonize Data
 
@@ -146,6 +157,20 @@ gdf = process.polygonize(
 
 # Save the results
 gdf.head()
+```
+
+```
+|    | pixel_id                         | tile   | date       | variable                     |   value | geometry
+                                                                                                 |
+|---:|:---------------------------------|:-------|:-----------|:-----------------------------|--------:|:--------------------------------------------------------------------------
+-------------------------------------------------------------------------------------------------|
+|  0 | 832d7e3f2e1e1b4c082450dc2c55695b | h21v04 | 2021-11-01 | AllAngle_Composite_Snow_Free |       0 | POLYGON ((30 49.99583333333334, 30.00416666666667 49.99583333333334, 30.00
+416666666667 50, 30 50, 30 49.99583333333334))                                                   |
+|  1 | cc3f405d6588e83e068cf95139226b4e | h21v04 | 2021-11-01 | AllAngle_Composite_Snow_Free |       0 | POLYGON ((30.004166666666666 49.99583333333334, 30.008333333333336 49.9958
+3333333334, 30.008333333333336 50, 30.004166666666666 50, 30.004166666666666 49.99583333333334)) |
+|  2 | fbcda96016cddc5701decea68cfb2b0d | h21v04 | 2021-11-01 | AllAngle_Composite_Snow_Free |       0 | POLYGON ((30.008333333333333 49.99583333333334, 30.012500000000003 49.99583333333334, 30.012500000000003 50, 30.008333333333333 50, 30.008333333333333 49.99583333333334)) |
+|  3 | ef914453eb14b7c27022450f6966e5a9 | h21v04 | 2021-11-01 | AllAngle_Composite_Snow_Free |       0 | POLYGON ((30.0125 49.99583333333334, 30.01666666666667 49.99583333333334, 30.01666666666667 50, 30.0125 50, 30.0125 49.99583333333334))                                    |
+|  4 | a7281d42070a22a0b69de920afea3681 | h21v04 | 2021-11-01 | AllAngle_Composite_Snow_Free |       0 | POLYGON ((30.016666666666666 49.99583333333334, 30.020833333333336 49.99583333333334, 30.020833333333336 50, 30.016666666666666 50, 30.016666666666666 49.99583333333334)) |
 ```
 
 ## License

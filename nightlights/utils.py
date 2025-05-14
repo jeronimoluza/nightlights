@@ -72,6 +72,11 @@ def get_file_date(file_path: str) -> str:
     julian_date = file_path.split("/")[-1].split(".")[1].replace("A", "")
     return datetime.datetime.strptime(julian_date, "%Y%j").strftime("%Y-%m-%d")
 
+def get_file_tile(file_path: str) -> str:
+    """
+    Extracts the tile from the file name.
+    """
+    return file_path.split("/")[-1].split(".")[2]
 
 def is_in_date_range(file_date, start_date: str, end_date: str) -> bool:
     """
