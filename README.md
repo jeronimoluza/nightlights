@@ -142,7 +142,7 @@ gdf = process.polygonize(
 )
 
 # Save the results
-gdf.to_csv('data/polygonized.csv')
+gdf.head()
 ```
 
 ## License
