@@ -222,7 +222,7 @@ def plot_nightlights(
     set_map_extent(ax, (lons, lats))
 
     # Add title with date and variable information
-    title = f"{title}\nDate: {date}\nVariable: {variable_name}"
+    title = f"{title}\nDate: {date}"
     plt.title(title)
 
     # Save the plot if output_dir is provided

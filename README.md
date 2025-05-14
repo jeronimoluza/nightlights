@@ -104,10 +104,10 @@ plotting.create_lineplot(
     region_crs=region_crs,
     functions=functions,
     events=events,
-    cut_off=1,
+    cut_off=1, # Will only consider values higher than the cut_off parameter for the lineplot
 )
 ```
-![Time Series Lineplot with Events](./assets/lineplot_20211101_AllAngle_Composite_Snow_Free.png)
+![Time Series Lineplot with Events](./assets/lineplot_AllAngle_Composite_Snow_Free.png)
 
 #### Side-by-Side Comparison
 
@@ -159,9 +159,8 @@ gdf = process.polygonize(
 gdf.head()
 ```
 
-```
+```markdown
 |    | pixel_id                         | tile   | date       | variable                     |   value | geometry
-                                                                                                 |
 |---:|:---------------------------------|:-------|:-----------|:-----------------------------|--------:|:--------------------------------------------------------------------------
 -------------------------------------------------------------------------------------------------|
 |  0 | 832d7e3f2e1e1b4c082450dc2c55695b | h21v04 | 2021-11-01 | AllAngle_Composite_Snow_Free |       0 | POLYGON ((30 49.99583333333334, 30.00416666666667 49.99583333333334, 30.00
