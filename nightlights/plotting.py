@@ -267,7 +267,6 @@ def create_timelapse_gif(
     # 3. Create timelapse GIF if we have multiple dates
     if len(files_by_date) > 1 and region is not None:
         print(f"Creating timelapse GIF from {len(files_by_date)} dates...")
-        print(f"Found {len(files_by_date)} different dates in the data.")
         if region is None:
             print("Error: Region is required for timelapse GIF creation.")
             return
@@ -536,3 +535,157 @@ def create_lineplot(
     
     print(f"Lineplot created at: {output_path}")
     return output_path
+
+
+def side_by_side(
+    files: List[str],
+    variable_name: str,
+    title: str,
+    date1: str,
+    date2: str,
+    region=None,
+    region_crs: int = 4326,
+    output_dir: str = None,
+    bins: int = 15,
+    log_scale: bool = True,
+) -> str:
+    """Create a side-by-side comparison of nightlights data for two dates.
+
+    Args:
+        files (List[str]): List of file paths to process
+        variable_name (str): Name of the variable to extract and plot
+        title (str): Title for the plot
+        date1 (str): First date to compare (format: YYYY-MM-DD)
+        date2 (str): Second date to compare (format: YYYY-MM-DD)
+        region: Optional region to filter data by (Polygon or MultiPolygon)
+        region_crs (int): Coordinate reference system of the region
+        output_dir (str): Directory to save the output image
+        bins (int): Number of bins for color scaling
+        log_scale (bool): Whether to apply log scaling
+
+    Returns:
+        str: Path to the saved comparison image
+    """
+    # Create output directory if it doesn't exist
+    if output_dir:
+        os.makedirs(output_dir, exist_ok=True)
+    
+    # Group files by date
+    files_by_date = group_files_by_date(files)
+    
+    if not files_by_date:
+        print("No valid files found for plotting.")
+        return None
+    
+    # Check if both dates exist in the data
+    if date1 not in files_by_date:
+        print(f"Date {date1} not found in the data.")
+        return None
+    if date2 not in files_by_date:
+        print(f"Date {date2} not found in the data.")
+        return None
+    
+    # Process data for both dates
+    data1 = process_files_for_date(
+        files_by_date[date1], variable_name, log_scale=log_scale, region=region, region_crs=region_crs
+    )
+    data2 = process_files_for_date(
+        files_by_date[date2], variable_name, log_scale=log_scale, region=region, region_crs=region_crs
+    )
+    
+    if data1 is None or np.all(np.isnan(data1)):
+        print(f"No valid data for date {date1}.")
+        return None
+    if data2 is None or np.all(np.isnan(data2)):
+        print(f"No valid data for date {date2}.")
+        return None
+    
+    # Find global min and max for consistent color scaling
+    global_min = min(data1.min().item(), data2.min().item())
+    global_max = max(data1.max().item(), data2.max().item())
+    
+    # Create levels and norm for consistent color scaling
+    levels = MaxNLocator(nbins=bins).tick_values(global_min, global_max)
+    norm = BoundaryNorm(levels, ncolors=plt.colormaps[DEFAULT_CMAP].N, clip=True)
+    
+    # Create a figure with two subplots side by side, with minimal spacing
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 10), subplot_kw={'projection': ccrs.PlateCarree()})
+    plt.subplots_adjust(wspace=0.05)  # Reduce space between subplots
+    
+    # Format date strings for display
+    date1_display = datetime.strptime(date1, "%Y-%m-%d").strftime("%Y-%m-%d")
+    date2_display = datetime.strptime(date2, "%Y-%m-%d").strftime("%Y-%m-%d")
+    
+    # Set up both maps with common features
+    for ax in [ax1, ax2]:
+        # Turn off the axes to remove blank space
+        # ax.axis('off')
+        
+        # Set background color
+        ax.set_facecolor(MAP_BACKGROUND_COLOR)
+
+        # Add water bodies
+        ax.add_feature(cfeature.OCEAN, facecolor=MAP_WATER_COLOR)
+        ax.add_feature(cfeature.LAKES, facecolor=MAP_WATER_COLOR)
+        ax.add_feature(cfeature.RIVERS, edgecolor=MAP_WATER_COLOR, linewidth=0.5)
+
+        # Add coastlines, borders, and other features
+        ax.coastlines(resolution="10m", color=MAP_COASTLINE_COLOR, linewidth=0.5)
+        ax.add_feature(cfeature.BORDERS, linewidth=0.3, edgecolor=MAP_BORDER_COLOR)
+        ax.add_feature(cfeature.STATES, linewidth=0.2, edgecolor=MAP_STATE_COLOR)
+    
+    # Plot data on the left subplot (date1)
+    mesh1 = ax1.pcolormesh(
+        data1.x,
+        data1.y,
+        data1,
+        cmap=DEFAULT_CMAP,
+        norm=norm,
+        transform=ccrs.PlateCarree(),
+    )
+    ax1.set_title(f"{title}\nDate: {date1_display}")
+    
+    # Plot data on the right subplot (date2)
+    mesh2 = ax2.pcolormesh(
+        data2.x,
+        data2.y,
+        data2,
+        cmap=DEFAULT_CMAP,
+        norm=norm,
+        transform=ccrs.PlateCarree(),
+    )
+    ax2.set_title(f"{title}\nDate: {date2_display}")
+    
+    # Set the extent for both maps
+    if region is not None:
+        for ax in [ax1, ax2]:
+            set_map_extent(ax, region.bounds)
+    else:
+        # Use the combined extent of both datasets
+        min_x = min(data1.x.min().item(), data2.x.min().item())
+        max_x = max(data1.x.max().item(), data2.x.max().item())
+        min_y = min(data1.y.min().item(), data2.y.min().item())
+        max_y = max(data1.y.max().item(), data2.y.max().item())
+        for ax in [ax1, ax2]:
+            set_map_extent(ax, (min_x, min_y, max_x, max_y))
+    
+    # Add a single horizontal colorbar below the two maps
+    cbar_ax = fig.add_axes([0.15, 0.2, 0.7, 0.05])  # [left, bottom, width, height]
+    cbar = fig.colorbar(mesh2, cax=cbar_ax, orientation='horizontal')
+    if log_scale:
+        cbar.set_label(LOG_RADIANCE_LABEL)
+    else:
+        cbar.set_label(RADIANCE_LABEL)
+    
+    # Add overall title
+    fig.suptitle(f"{title}\nVariable: {variable_name}", fontsize=16, y=0.85)
+    
+    # Save the figure
+    if output_dir:
+        output_path = os.path.join(output_dir, f"comparison_{variable_name}_{date1_display.replace('-','')}_{date2_display.replace('-','')}.png")
+        plt.savefig(output_path, dpi=300, bbox_inches="tight")
+        plt.close(fig)
+        print(f"Side-by-side comparison created at: {output_path}")
+        return output_path
+    else:
+        return None

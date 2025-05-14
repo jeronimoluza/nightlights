@@ -45,33 +45,46 @@ def do_main():
     #     region=region,
     # )
 
-    plotting.create_timelapse_gif(
-        files,
-        variable_name=variable_name,
-        title="Madrid Blackout",
-        output_dir=plot_dir,
-        region=region,
-        region_crs=region_crs,
-        fps=2.0,
-    )
+    # plotting.create_timelapse_gif(
+    #     files,
+    #     variable_name=variable_name,
+    #     title="Andalucía Nightlights",
+    #     output_dir=plot_dir,
+    #     region=region,
+    #     region_crs=region_crs,
+    #     fps=2.0,
+    # )
 
-    # Define functions to apply to the data
-    functions = [
-        {"Mean": np.mean},
-        {"Median": np.median},
-        {"Max": np.max}
-    ]
+    # # Define functions to apply to the data
+    # functions = [
+    #     {"Mean": np.mean},
+    #     {"Median": np.median},
+    #     {"Max": np.max}
+    # ]
 
-    # Create the lineplot
-    plotting.create_lineplot(
-        files=files,
-        variable_name=variable_name,
-        title="Nightlights Trends",
-        output_dir=plot_dir,
-        region=region,
-        region_crs=region_crs,
-        functions=functions
-    )
+    # # Create the lineplot
+    # plotting.create_lineplot(
+    #     files=files,
+    #     variable_name=variable_name,
+    #     title="Nightlights Trends",
+    #     output_dir=plot_dir,
+    #     region=region,
+    #     region_crs=region_crs,
+    #     functions=functions
+    # )
+
+    plotting.side_by_side(
+    files=files,
+    variable_name=variable_name,
+    title="Nightlights Comparison",
+    date1="2023-05-01",
+    date2="2024-05-01",
+    region=region,
+    region_crs=region_crs,
+    output_dir=plot_dir,
+    bins=15,
+    log_scale=True
+)
     raise
     # Use the optimized polygonization approach (default behavior)
     gdf = process.polygonize(
