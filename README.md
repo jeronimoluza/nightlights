@@ -133,7 +133,7 @@ plotting.side_by_side(
 plotting.create_timelapse_gif(
     files=files,
     variable_name=variable_name,
-    title="Israel Invades Gaza",
+    title="Nightlight Intensity\nKyiv City and Oblast",
     output_dir=plot_dir,
     region=region,
     region_crs=region_crs,
