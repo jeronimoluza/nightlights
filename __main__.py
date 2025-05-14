@@ -31,23 +31,25 @@ def do_main():
     variable_name = "AllAngle_Composite_Snow_Free"
     # variable_name = "DNB_BRDF-Corrected_NTL"
 
-    # plotting.plot_nightlights(
-    #     files,
-    #     variable_name=variable_name,
-    #     date="2021-01-01",
-    #     output_dir=plot_dir,
-    #     region=region,
-    # )
+    plotting.plot_nightlights(
+        files,
+        title="Andalucía Nightlights",
+        variable_name=variable_name,
+        date="2024-01-01",
+        output_dir=plot_dir,
+        region=region,
+    )
 
-    # plotting.create_timelapse_gif(
-    #     files,
-    #     variable_name=variable_name,
-    #     title="Andalucía Nightlights",
-    #     output_dir=plot_dir,
-    #     region=region,
-    #     region_crs=region_crs,
-    #     fps=2.0,
-    # )
+    raise
+    plotting.create_timelapse_gif(
+        files,
+        variable_name=variable_name,
+        title="Andalucía Nightlights",
+        output_dir=plot_dir,
+        region=region,
+        region_crs=region_crs,
+        fps=2.0,
+    )
 
     # # Define functions to apply to the data
     functions = [
@@ -80,7 +82,6 @@ def do_main():
 #     bins=15,
 #     log_scale=True
 # )
-    raise
     # Use the optimized polygonization approach (default behavior)
     gdf = process.polygonize(
         files, variable_name=variable_name, region=region, region_crs=region_crs, optimize_geometry=True

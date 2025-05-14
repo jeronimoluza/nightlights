@@ -135,6 +135,7 @@ def add_colorbar(ax: plt.Axes, mesh, log_scale: bool = True):
 
 def plot_nightlights(
     files: list,
+    title: str,
     variable_name: str,
     date: str,
     output_dir: str = None,
@@ -149,6 +150,7 @@ def plot_nightlights(
 
     Args:
         files (list): List of paths to h5 files
+        title (str): Title to display at the top of the plot
         variable_name (str): Name of the variable to plot
         date (str): Date string to filter files by (format: YYYY-MM-DD)
         output_dir (str, optional): Directory to save the plot. If None, the plot will be displayed.
@@ -194,8 +196,8 @@ def plot_nightlights(
     # Create a mesh grid for the longitudes and latitudes
     lon_mesh, lat_mesh = np.meshgrid(lons, lats)
 
-    global_min = np.min(data)
-    global_max = np.max(data)
+    global_min = np.nanmin(data)
+    global_max = np.nanmax(data)
 
     # Prepare to create frames for each date with consistent color scaling
     levels = MaxNLocator(nbins=bins).tick_values(global_min, global_max)
@@ -220,16 +222,14 @@ def plot_nightlights(
     set_map_extent(ax, (lons, lats))
 
     # Add title with date and variable information
-    title = f"Nightlights: {date}\nDate: {date}\nVariable: {variable_name}"
-    if log_scale:
-        title += "\nLog Scale"
+    title = f"{title}\nDate: {date}\nVariable: {variable_name}"
     plt.title(title)
 
     # Save the plot if output_dir is provided
     if output_dir:
         os.makedirs(output_dir, exist_ok=True)
         output_path = os.path.join(
-            output_dir, f"nightlights_{date}_{variable_name}.png"
+            output_dir, f"nightlights_{date.replace('-','')}_{variable_name}.png"
         )
         plt.savefig(output_path, dpi=300, bbox_inches="tight")
         print(f"Plot saved to: {output_path}")
