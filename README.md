@@ -7,7 +7,7 @@ A Python toolkit for downloading, processing, and visualizing NASA's Black Marbl
 ### Prerequisites
 - Python 3.10 or higher
 - Poetry (for dependency management)
-- Earth Access account
+- Access to an [Earthdata Account](https://urs.earthdata.nasa.gov/)
 
 ### Setup
 
@@ -32,7 +32,7 @@ download_dir = "./data/raw"
 plot_dir = "./assets/"
 
 # Define search parameters
-short_name = "VNP46A3" # VIIRS Black Marble product
+short_name = "VNP46A3" # VIIRS Black Marble products: VNP46A2, VNP46A3, VNP46A4
 start_date = "2021-11-01"
 end_date = "2022-05-01"
 
@@ -41,6 +41,7 @@ regions = [
     "Kyiv, Ukraine",
     "Kyiv Oblast, Ukraine",
 ]
+
 region_gdf = download.find_region(query=regions)
 region_crs = region_gdf.crs.to_epsg()
 region = region_gdf.union_all()
