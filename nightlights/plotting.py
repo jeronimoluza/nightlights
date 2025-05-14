@@ -420,6 +420,7 @@ def create_lineplot(
     variable_name: str,
     title: str,
     output_dir: str,
+    cut_off: float = 0.0,
     log_scale: bool = False,
     region=None,
     region_crs: int = 4326,
@@ -432,6 +433,7 @@ def create_lineplot(
         variable_name (str): Name of the variable to extract and plot
         title (str): Title for the plot
         output_dir (str): Directory to save the lineplot
+        cut_off (float): Value to cut off the data at
         log_scale (bool): Whether to apply log scaling
         region: Optional region to filter data by (Polygon or MultiPolygon)
         region_crs (int): Coordinate reference system of the region
@@ -489,6 +491,7 @@ def create_lineplot(
         data = date_values[date]
         # Remove NaN values for calculations
         valid_data = data.values[~np.isnan(data.values)]
+        valid_data = valid_data[valid_data > cut_off]
         
         if len(valid_data) > 0:
             for func_dict in functions:
@@ -513,7 +516,7 @@ def create_lineplot(
             ax.plot(x_values, results[label], marker='o', linestyle='-', label=label)
     
     # Format the plot
-    ax.set_title(f"{title}\nVariable: {variable_name}")
+    ax.set_title(f"{title}\nVariable: {variable_name}\nCut Off Value: {cut_off}")
     ax.set_xlabel("Date")
     if log_scale:
         ax.set_ylabel(LOG_RADIANCE_LABEL)
