@@ -7,9 +7,7 @@ def do_main():
     from nightlights import download, plotting, process
 
     download_dir = "./data/raw"
-    extraction_dir = "./data/extracted"
     plot_dir = "./data/plots"
-    final_output_dir = "./data/output"
 
     # Define search parameters
     short_name = "VNP46A3"
@@ -17,11 +15,7 @@ def do_main():
     end_date = "2024-05-05"
 
     regions = ["Andalucía, Spain"]
-    region_gdf = gpd.GeoDataFrame(
-        pd.concat(
-            [download.find_region(query=region) for region in regions], ignore_index=True
-        ), geometry="geometry"
-    )
+    region_gdf = download.find_region(query=regions)
 
     region_crs = region_gdf.crs.to_epsg()
     region = region_gdf.union_all()

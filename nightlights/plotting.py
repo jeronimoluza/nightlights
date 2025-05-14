@@ -13,6 +13,10 @@ import imageio.v2 as imageio
 from datetime import datetime
 from typing import List, Tuple, Union
 
+from nightlights.process import (
+    process_files_for_date,
+    group_files_by_date,
+)
 
 # Constants
 DEFAULT_CMAP = "cividis"
@@ -28,16 +32,6 @@ MAP_WATER_COLOR = "lightblue"  # Color for water bodies (ocean, lakes, rivers)
 
 LOG_RADIANCE_LABEL = f"Log radiance (nW·cm$^{-2}$·sr$^{-1}$)"
 RADIANCE_LABEL = f"Radiance (nW·cm$^{-2}$·sr$^{-1}$)"
-
-from nightlights.process import (
-    process_files_for_date,
-    prepare_data,
-    create_dataarray_from_raw,
-    group_files_by_date
-)
-
-
-
 
 
 def setup_map_figure(
@@ -118,9 +112,7 @@ def set_map_extent(
     )
 
 
-def add_colorbar(
-    ax: plt.Axes, mesh, log_scale: bool = True
-):
+def add_colorbar(ax: plt.Axes, mesh, log_scale: bool = True):
     """
     Add a colorbar to a plot.
 
@@ -150,6 +142,7 @@ def plot_nightlights(
     cmap: str = DEFAULT_CMAP,
     region=None,
     region_crs: int = 4326,
+    bins: int = 15,
 ) -> Tuple[plt.Figure, plt.Axes]:
     """
     Plot nightlights data from a list of h5 files for a specific date using cartopy and matplotlib.
@@ -170,22 +163,26 @@ def plot_nightlights(
     # Group files by date
     files_by_date = group_files_by_date(files)
     combined_data = None
-    
+
     # Find files for the requested date
     if date in files_by_date:
         # Process files for this date
         combined_data = process_files_for_date(
-            files_by_date[date], variable_name, log_scale=log_scale, region=region, region_crs=region_crs
+            files_by_date[date],
+            variable_name,
+            log_scale=log_scale,
+            region=region,
+            region_crs=region_crs,
         )
     else:
         print(f"No files found for date: {date}")
         print(f"Available dates: {list(files_by_date.keys())}")
         return None, None
-    
+
     if combined_data is None:
         print(f"Failed to process data for date: {date}")
         return None, None
-        
+
     # Extract data arrays from the combined data
     data = combined_data.values
     lons = combined_data.x.values
@@ -197,9 +194,14 @@ def plot_nightlights(
     # Create a mesh grid for the longitudes and latitudes
     lon_mesh, lat_mesh = np.meshgrid(lons, lats)
 
+    global_min = np.min(data)
+    global_max = np.max(data)
+
     # Prepare to create frames for each date with consistent color scaling
     levels = MaxNLocator(nbins=bins).tick_values(global_min, global_max)
-    norm = BoundaryNorm(levels, ncolors=plt.colormaps[DEFAULT_CMAP].N, clip=True)
+    norm = BoundaryNorm(
+        levels, ncolors=plt.colormaps[DEFAULT_CMAP].N, clip=True
+    )
 
     # Plot the data using pcolormesh
     mesh = ax.pcolormesh(
@@ -234,7 +236,6 @@ def plot_nightlights(
         plt.close(fig)
 
     return fig, ax
-
 
 
 def create_timelapse_gif(
@@ -284,7 +285,11 @@ def create_timelapse_gif(
         for date, date_files in files_by_date.items():
             # Process files for this date
             combined_data = process_files_for_date(
-                files=date_files, variable_name=variable_name, log_scale=True, region=region, region_crs=region_crs
+                files=date_files,
+                variable_name=variable_name,
+                log_scale=True,
+                region=region,
+                region_crs=region_crs,
             )
             if combined_data is None:
                 print(f"Warning: No valid data for date {date}, skipping")
@@ -308,8 +313,10 @@ def create_timelapse_gif(
 
         # Prepare to create frames for each date with consistent color scaling
         levels = MaxNLocator(nbins=bins).tick_values(global_min, global_max)
-        norm = BoundaryNorm(levels, ncolors=plt.colormaps[DEFAULT_CMAP].N, clip=True)
-        
+        norm = BoundaryNorm(
+            levels, ncolors=plt.colormaps[DEFAULT_CMAP].N, clip=True
+        )
+
         # Create a frame for each date with consistent color scaling
         frame_paths = []
         sorted_dates = sorted(date_data_dict.keys())
@@ -396,7 +403,6 @@ def create_frame(
     return frame_path
 
 
-
 def create_gif(
     frame_paths: List[str], output_path: str, fps: float = 1.0
 ) -> None:
@@ -437,9 +443,9 @@ def create_lineplot(
         log_scale (bool): Whether to apply log scaling
         region: Optional region to filter data by (Polygon or MultiPolygon)
         region_crs (int): Coordinate reference system of the region
-        functions (List[dict]): List of dictionaries with format {"label": function}, 
+        functions (List[dict]): List of dictionaries with format {"label": function},
                                where function is a callable that processes the data
-        events (List[Tuple[str, str]], optional): List of tuples containing (event_name, date) 
+        events (List[Tuple[str, str]], optional): List of tuples containing (event_name, date)
                                to mark on the plot with vertical lines and annotations.
                                Date should be in format "YYYY-MM-DD".
 
@@ -451,51 +457,55 @@ def create_lineplot(
 
     # Group files by date
     files_by_date = group_files_by_date(files)
-    
+
     if not files_by_date:
         print("No valid files found for plotting.")
         return None
 
     # Create a dictionary to store processed data for each date and function
     date_values = {}
-    
+
     # Process each date's data
     for date, date_files in sorted(files_by_date.items()):
         try:
             # Process files for this date
             combined_data = process_files_for_date(
-                date_files, variable_name, log_scale=log_scale, region=region, region_crs=region_crs
+                date_files,
+                variable_name,
+                log_scale=log_scale,
+                region=region,
+                region_crs=region_crs,
             )
-            
+
             if combined_data is None or np.all(np.isnan(combined_data)):
                 print(f"Warning: No valid data for date {date}, skipping")
                 continue
-            
+
             # Store the processed data for this date
             date_values[date] = combined_data
         except Exception as e:
             print(f"Error processing data for date {date}: {e}")
-    
+
     if not date_values:
         print("No valid data found for any date. Cannot create lineplot.")
         return None
-    
+
     # Calculate function values for each date
     results = {}
     for func_dict in functions:
         for label, func in func_dict.items():
             results[label] = []
-    
+
     dates = sorted(date_values.keys())
     x_values = [datetime.strptime(date, "%Y-%m-%d") for date in dates]
-    
+
     # Apply each function to each date's data
     for date in dates:
         data = date_values[date]
         # Remove NaN values for calculations
         valid_data = data.values[~np.isnan(data.values)]
         valid_data = valid_data[valid_data > cut_off]
-        
+
         if len(valid_data) > 0:
             for func_dict in functions:
                 for label, func in func_dict.items():
@@ -503,65 +513,82 @@ def create_lineplot(
                         value = func(valid_data)
                         results[label].append(value)
                     except Exception as e:
-                        print(f"Error applying function {label} to data for date {date}: {e}")
+                        print(
+                            f"Error applying function {label} to data for date {date}: {e}"
+                        )
                         results[label].append(np.nan)
         else:
             # If no valid data, add NaN for all functions
             for func_dict in functions:
                 for label in func_dict.keys():
                     results[label].append(np.nan)
-    
+
     # Create the lineplot
     fig, ax = plt.subplots(figsize=(12, 8))
-    
+
     for func_dict in functions:
         for label, _ in func_dict.items():
-            ax.plot(x_values, results[label], marker='o', linestyle='-', label=label)
-    
+            ax.plot(
+                x_values,
+                results[label],
+                marker="o",
+                linestyle="-",
+                label=label,
+            )
+
     # Format the plot
-    ax.set_title(f"{title}\nVariable: {variable_name}\nCut Off Value: {cut_off}")
+    ax.set_title(
+        f"{title}\nVariable: {variable_name}\nCut Off Value: {cut_off}"
+    )
     ax.set_xlabel("Date")
     if log_scale:
         ax.set_ylabel(LOG_RADIANCE_LABEL)
     else:
         ax.set_ylabel(RADIANCE_LABEL)
-    ax.grid(True, linestyle='--', alpha=0.7)
+    ax.grid(True, linestyle="--", alpha=0.7)
     ax.legend()
-    
+
     # Add event markers if provided
     if events:
         # Get y-axis limits for positioning annotations
         y_min, y_max = ax.get_ylim()
         y_range = y_max - y_min
-        
+
         for event_name, event_date in events:
             try:
                 # Convert event date string to datetime
                 event_datetime = datetime.strptime(event_date, "%Y-%m-%d")
-                
+
                 # Plot vertical line for the event
-                ax.axvline(x=event_datetime, color='red', linestyle='--', alpha=0.7)
-                
+                ax.axvline(
+                    x=event_datetime, color="red", linestyle="--", alpha=0.7
+                )
+
                 # Add annotation at the top of the plot, to the right of the line
-                ax.annotate(event_name, 
-                           xy=(event_datetime, y_max - 0.05 * y_range),
-                           xytext=(event_datetime + (x_values[-1] - x_values[0]) * 0.02, y_max - 0.05 * y_range),
-                           ha='left',
-                           va='top',
-                           color='red',
-                           fontweight='bold')
+                ax.annotate(
+                    event_name,
+                    xy=(event_datetime, y_max - 0.05 * y_range),
+                    xytext=(
+                        event_datetime + (x_values[-1] - x_values[0]) * 0.02,
+                        y_max - 0.05 * y_range,
+                    ),
+                    ha="left",
+                    va="top",
+                    color="red",
+                    fontweight="bold",
+                )
             except ValueError as e:
                 print(f"Error plotting event {event_name}: {e}")
-    
+
     # Format x-axis dates
     fig.autofmt_xdate()
-    
+
     # Save the plot
     os.makedirs(output_dir, exist_ok=True)
     output_path = os.path.join(output_dir, f"lineplot_{variable_name}.png")
     plt.savefig(output_path, dpi=300, bbox_inches="tight")
     plt.close(fig)
-    
+
     print(f"Lineplot created at: {output_path}")
     return output_path
 
@@ -598,14 +625,14 @@ def side_by_side(
     # Create output directory if it doesn't exist
     if output_dir:
         os.makedirs(output_dir, exist_ok=True)
-    
+
     # Group files by date
     files_by_date = group_files_by_date(files)
-    
+
     if not files_by_date:
         print("No valid files found for plotting.")
         return None
-    
+
     # Check if both dates exist in the data
     if date1 not in files_by_date:
         print(f"Date {date1} not found in the data.")
@@ -613,56 +640,76 @@ def side_by_side(
     if date2 not in files_by_date:
         print(f"Date {date2} not found in the data.")
         return None
-    
+
     # Process data for both dates
     data1 = process_files_for_date(
-        files_by_date[date1], variable_name, log_scale=log_scale, region=region, region_crs=region_crs
+        files_by_date[date1],
+        variable_name,
+        log_scale=log_scale,
+        region=region,
+        region_crs=region_crs,
     )
     data2 = process_files_for_date(
-        files_by_date[date2], variable_name, log_scale=log_scale, region=region, region_crs=region_crs
+        files_by_date[date2],
+        variable_name,
+        log_scale=log_scale,
+        region=region,
+        region_crs=region_crs,
     )
-    
+
     if data1 is None or np.all(np.isnan(data1)):
         print(f"No valid data for date {date1}.")
         return None
     if data2 is None or np.all(np.isnan(data2)):
         print(f"No valid data for date {date2}.")
         return None
-    
+
     # Find global min and max for consistent color scaling
     global_min = min(data1.min().item(), data2.min().item())
     global_max = max(data1.max().item(), data2.max().item())
-    
+
     # Create levels and norm for consistent color scaling
     levels = MaxNLocator(nbins=bins).tick_values(global_min, global_max)
-    norm = BoundaryNorm(levels, ncolors=plt.colormaps[DEFAULT_CMAP].N, clip=True)
-    
+    norm = BoundaryNorm(
+        levels, ncolors=plt.colormaps[DEFAULT_CMAP].N, clip=True
+    )
+
     # Create a figure with two subplots side by side, with minimal spacing
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 10), subplot_kw={'projection': ccrs.PlateCarree()})
+    fig, (ax1, ax2) = plt.subplots(
+        1, 2, figsize=(20, 10), subplot_kw={"projection": ccrs.PlateCarree()}
+    )
     plt.subplots_adjust(wspace=0.05)  # Reduce space between subplots
-    
+
     # Format date strings for display
     date1_display = datetime.strptime(date1, "%Y-%m-%d").strftime("%Y-%m-%d")
     date2_display = datetime.strptime(date2, "%Y-%m-%d").strftime("%Y-%m-%d")
-    
+
     # Set up both maps with common features
     for ax in [ax1, ax2]:
         # Turn off the axes to remove blank space
         # ax.axis('off')
-        
+
         # Set background color
         ax.set_facecolor(MAP_BACKGROUND_COLOR)
 
         # Add water bodies
         ax.add_feature(cfeature.OCEAN, facecolor=MAP_WATER_COLOR)
         ax.add_feature(cfeature.LAKES, facecolor=MAP_WATER_COLOR)
-        ax.add_feature(cfeature.RIVERS, edgecolor=MAP_WATER_COLOR, linewidth=0.5)
+        ax.add_feature(
+            cfeature.RIVERS, edgecolor=MAP_WATER_COLOR, linewidth=0.5
+        )
 
         # Add coastlines, borders, and other features
-        ax.coastlines(resolution="10m", color=MAP_COASTLINE_COLOR, linewidth=0.5)
-        ax.add_feature(cfeature.BORDERS, linewidth=0.3, edgecolor=MAP_BORDER_COLOR)
-        ax.add_feature(cfeature.STATES, linewidth=0.2, edgecolor=MAP_STATE_COLOR)
-    
+        ax.coastlines(
+            resolution="10m", color=MAP_COASTLINE_COLOR, linewidth=0.5
+        )
+        ax.add_feature(
+            cfeature.BORDERS, linewidth=0.3, edgecolor=MAP_BORDER_COLOR
+        )
+        ax.add_feature(
+            cfeature.STATES, linewidth=0.2, edgecolor=MAP_STATE_COLOR
+        )
+
     # Plot data on the left subplot (date1)
     mesh1 = ax1.pcolormesh(
         data1.x,
@@ -673,7 +720,7 @@ def side_by_side(
         transform=ccrs.PlateCarree(),
     )
     ax1.set_title(f"{title}\nDate: {date1_display}")
-    
+
     # Plot data on the right subplot (date2)
     mesh2 = ax2.pcolormesh(
         data2.x,
@@ -684,7 +731,7 @@ def side_by_side(
         transform=ccrs.PlateCarree(),
     )
     ax2.set_title(f"{title}\nDate: {date2_display}")
-    
+
     # Set the extent for both maps
     if region is not None:
         for ax in [ax1, ax2]:
@@ -697,21 +744,26 @@ def side_by_side(
         max_y = max(data1.y.max().item(), data2.y.max().item())
         for ax in [ax1, ax2]:
             set_map_extent(ax, (min_x, min_y, max_x, max_y))
-    
+
     # Add a single horizontal colorbar below the two maps
-    cbar_ax = fig.add_axes([0.15, 0.2, 0.7, 0.05])  # [left, bottom, width, height]
-    cbar = fig.colorbar(mesh2, cax=cbar_ax, orientation='horizontal')
+    cbar_ax = fig.add_axes(
+        [0.15, 0.2, 0.7, 0.05]
+    )  # [left, bottom, width, height]
+    cbar = fig.colorbar(mesh2, cax=cbar_ax, orientation="horizontal")
     if log_scale:
         cbar.set_label(LOG_RADIANCE_LABEL)
     else:
         cbar.set_label(RADIANCE_LABEL)
-    
+
     # Add overall title
     fig.suptitle(f"{title}\nVariable: {variable_name}", fontsize=16, y=0.85)
-    
+
     # Save the figure
     if output_dir:
-        output_path = os.path.join(output_dir, f"comparison_{variable_name}_{date1_display.replace('-','')}_{date2_display.replace('-','')}.png")
+        output_path = os.path.join(
+            output_dir,
+            f"comparison_{variable_name}_{date1_display.replace('-','')}_{date2_display.replace('-','')}.png",
+        )
         plt.savefig(output_path, dpi=300, bbox_inches="tight")
         plt.close(fig)
         print(f"Side-by-side comparison created at: {output_path}")

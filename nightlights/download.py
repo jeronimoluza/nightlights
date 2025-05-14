@@ -2,16 +2,17 @@ import os
 import earthaccess
 import nightlights.utils as utils
 import geopandas as gpd
+import pandas as pd
 import osmnx as ox
 
 AVAILABLE_SHORT_NAMES = ["VNP46A1", "VNP46A2", "VNP46A3", "VNP46A4"]
+
 
 def earthaccess_login():
     """
     Logs the user in to earthaccess
     """
     return earthaccess.login()
-
 
 
 def filter_granules(granules: list, start_date: str, end_date: str):
@@ -63,7 +64,7 @@ def download_earthaccess(
     else:
         version = "1"
 
-    auth = earthaccess_login()
+    _ = earthaccess_login()
 
     bounding_box = utils.get_bounding_box(region=region)
 
@@ -96,15 +97,26 @@ def download_earthaccess(
         print(f"Downloaded {len(files)} files to {download_dir}.")
         return files
 
-def find_region(query: str) -> gpd.GeoDataFrame:
+
+def find_region(query: str | list) -> gpd.GeoDataFrame:
     """
     Find the boundary of a region using OpenStreetMap.
-    
+
     Parameters:
-    - query (str): The query to search for the region.
-    
+    - query (str | list): The query to search for the region.
+
     Returns:
     - gpd.GeoDataFrame: The boundary of the region.
     """
-    gdf = ox.geocode_to_gdf(query)
-    return gdf
+    if isinstance(query, list):
+        gdf = gpd.GeoDataFrame(
+            pd.concat(
+                [ox.geocode_to_gdf(query=region) for region in query],
+                ignore_index=True,
+            ),
+            geometry="geometry",
+        )
+        return gdf
+    else:
+        gdf = ox.geocode_to_gdf(query=query)
+        return gdf
