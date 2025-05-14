@@ -56,35 +56,36 @@ def do_main():
     # )
 
     # # Define functions to apply to the data
-    # functions = [
-    #     {"Mean": np.mean},
-    #     {"Median": np.median},
-    #     {"Max": np.max}
-    # ]
+    functions = [
+        {"Mean": np.mean},
+        {"Median": np.median},
+    ]
 
-    # # Create the lineplot
-    # plotting.create_lineplot(
-    #     files=files,
-    #     variable_name=variable_name,
-    #     title="Nightlights Trends",
-    #     output_dir=plot_dir,
-    #     region=region,
-    #     region_crs=region_crs,
-    #     functions=functions
-    # )
+    events = [("Event 1", "2023-10-01"), ("Event 2", "2024-02-01")]
+    # Create the lineplot
+    plotting.create_lineplot(
+        files=files,
+        variable_name=variable_name,
+        title="Nightlights Trends",
+        output_dir=plot_dir,
+        region=region,
+        region_crs=region_crs,
+        functions=functions,
+        events=events
+    )
 
-    plotting.side_by_side(
-    files=files,
-    variable_name=variable_name,
-    title="Nightlights Comparison",
-    date1="2023-05-01",
-    date2="2024-05-01",
-    region=region,
-    region_crs=region_crs,
-    output_dir=plot_dir,
-    bins=15,
-    log_scale=True
-)
+#     plotting.side_by_side(
+#     files=files,
+#     variable_name=variable_name,
+#     title="Nightlights Comparison",
+#     date1="2023-05-01",
+#     date2="2024-05-01",
+#     region=region,
+#     region_crs=region_crs,
+#     output_dir=plot_dir,
+#     bins=15,
+#     log_scale=True
+# )
     raise
     # Use the optimized polygonization approach (default behavior)
     gdf = process.polygonize(

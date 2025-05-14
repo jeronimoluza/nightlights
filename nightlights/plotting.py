@@ -424,6 +424,7 @@ def create_lineplot(
     region=None,
     region_crs: int = 4326,
     functions: List[dict] = None,
+    events: List[Tuple[str, str]] = None,
 ) -> str:
     """Create a lineplot showing the values of a variable over time, applying different functions to the data.
 
@@ -438,6 +439,9 @@ def create_lineplot(
         region_crs (int): Coordinate reference system of the region
         functions (List[dict]): List of dictionaries with format {"label": function}, 
                                where function is a callable that processes the data
+        events (List[Tuple[str, str]], optional): List of tuples containing (event_name, date) 
+                               to mark on the plot with vertical lines and annotations.
+                               Date should be in format "YYYY-MM-DD".
 
     Returns:
         str: Path to the saved lineplot image
@@ -523,6 +527,31 @@ def create_lineplot(
         ax.set_ylabel(RADIANCE_LABEL)
     ax.grid(True, linestyle='--', alpha=0.7)
     ax.legend()
+    
+    # Add event markers if provided
+    if events:
+        # Get y-axis limits for positioning annotations
+        y_min, y_max = ax.get_ylim()
+        y_range = y_max - y_min
+        
+        for event_name, event_date in events:
+            try:
+                # Convert event date string to datetime
+                event_datetime = datetime.strptime(event_date, "%Y-%m-%d")
+                
+                # Plot vertical line for the event
+                ax.axvline(x=event_datetime, color='red', linestyle='--', alpha=0.7)
+                
+                # Add annotation at the top of the plot, to the right of the line
+                ax.annotate(event_name, 
+                           xy=(event_datetime, y_max - 0.05 * y_range),
+                           xytext=(event_datetime + (x_values[-1] - x_values[0]) * 0.02, y_max - 0.05 * y_range),
+                           ha='left',
+                           va='top',
+                           color='red',
+                           fontweight='bold')
+            except ValueError as e:
+                print(f"Error plotting event {event_name}: {e}")
     
     # Format x-axis dates
     fig.autofmt_xdate()
