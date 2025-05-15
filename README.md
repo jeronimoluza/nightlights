@@ -146,6 +146,8 @@ plotting.create_timelapse_gif(
 
 ### 4. Advanced Processing: Polygonize Data
 
+The extraction of pixel boundaries from each file involves a calculation of geographical coordinates based on the Black Marble tile's limits and file matrix dimensions. The process begins by determining the size of each tile in degrees using its west, north, east, and south bounds. Then, utilizing the matrix dimensions (rows and columns), the distances between pixel boundaries are calculated. Specifically, the distance from the west-east bounds of the tile is divided by the number of rows (X) to determine the longitude increment per pixel, while the distance from the north-south bounds is divided by the number of columns (Y) to calculate the latitude increment per pixel.
+
 ```python
 # Convert raster data to vector polygons for GIS analysis
 gdf = process.polygonize(
