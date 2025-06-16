@@ -11,6 +11,14 @@ A Python toolkit for downloading, processing, and visualizing NASA's Black Marbl
 
 ### Setup
 
+Install using `pip`:
+
+```bash
+pip install nightlights
+```
+
+Or clone the repository and install it using `poetry`:
+
 ```bash
 # Clone the repository
 git clone https://github.com/jeronimoluza/nightlights.git
